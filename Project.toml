@@ -1,0 +1,10 @@
+name = "EcoEvolutionSim"
+uuid = "366dc0ea-2b56-42b8-91d2-8fea95b69baa"
+version = "0.1.0"
+authors = ["Nishant <nishs1729@gmail.com>"]
+
+[deps]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+
+[compat]
+Random = "1.11.0"
