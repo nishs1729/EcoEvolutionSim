@@ -2,12 +2,8 @@ module EcoEvolutionSim
 
 include("simulator.jl")
 
-greet() = print("Hello World!")
-export greet
+export init_simulation, step!
+export Simulation, Agents, CellGrid
+export cell_index
 
-export init_simulation
-export step!
-
-
-
-end # module EcoEvolutionSim
+end

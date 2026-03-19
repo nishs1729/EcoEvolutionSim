@@ -23,8 +23,8 @@ end
 
 struct CellGrid
     cell_start::Vector{Int}
-    cell_count::Vector{Int}
-    cell_offset::Vector{Int}
+    cell_count::Vector{Threads.Atomic{Int}}
+    cell_offset::Vector{Threads.Atomic{Int}}
     agent_index::Vector{Int}
 end
 
@@ -113,8 +113,10 @@ function build_cell_grid!(sim::Simulation)
     agents = sim.agents
     grid = sim.grid
 
-    fill!(grid.cell_count,0)
-    fill!(grid.cell_offset,0)
+    for c in 1:sim.ncells
+        grid.cell_count[c][] = 0
+        grid.cell_offset[c][] = 0
+    end
 
     N = length(agents.x)
 
@@ -131,7 +133,7 @@ function build_cell_grid!(sim::Simulation)
             sim.nx
         )
 
-        @atomic grid.cell_count[c] += 1
+        Threads.atomic_add!(grid.cell_count[c], 1)
 
     end
 
@@ -143,7 +145,7 @@ function build_cell_grid!(sim::Simulation)
 
     for c in 1:sim.ncells
         grid.cell_start[c] = s
-        s += grid.cell_count[c]
+        s += grid.cell_count[c][]
     end
 
     ########################################
@@ -159,7 +161,7 @@ function build_cell_grid!(sim::Simulation)
             sim.nx
         )
 
-        idx = atomic_add!(grid.cell_offset,c,1)
+        idx = Threads.atomic_add!(grid.cell_offset[c], 1)
 
         grid.agent_index[
             grid.cell_start[c] + idx
@@ -239,7 +241,7 @@ function interaction_step!(sim::Simulation)
         for nc in sim.neighbor_cells[c]
 
             start = grid.cell_start[nc]
-            stop = start + grid.cell_count[nc] - 1
+            stop = start + grid.cell_count[nc][] - 1
 
             for k in start:stop
 
@@ -282,8 +284,22 @@ function movement_step!(sim::Simulation)
         agents.x[i] += 0.1f0*(rand(Float32)-0.5f0)
         agents.y[i] += 0.1f0*(rand(Float32)-0.5f0)
 
-        agents.x[i] = mod(agents.x[i],world)
-        agents.y[i] = mod(agents.y[i],world)
+        # Reflective boundaries
+        if agents.x[i] < 0.0f0
+            agents.x[i] = -agents.x[i]
+        elseif agents.x[i] > world
+            agents.x[i] = 2.0f0*world - agents.x[i]
+        end
+
+        if agents.y[i] < 0.0f0
+            agents.y[i] = -agents.y[i]
+        elseif agents.y[i] > world
+            agents.y[i] = 2.0f0*world - agents.y[i]
+        end
+        
+        # Double check clamping just in case of extreme steps
+        agents.x[i] = clamp(agents.x[i], 0.0f0, world)
+        agents.y[i] = clamp(agents.y[i], 0.0f0, world)
 
     end
 
@@ -327,8 +343,8 @@ function init_simulation(N,world_size,cell_size)
 
     grid = CellGrid(
         zeros(Int,ncells),
-        zeros(Int,ncells),
-        zeros(Int,ncells),
+        [Threads.Atomic{Int}(0) for _ in 1:ncells],
+        [Threads.Atomic{Int}(0) for _ in 1:ncells],
         Vector{Int}(undef,N)
     )
 

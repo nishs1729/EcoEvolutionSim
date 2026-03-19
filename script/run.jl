@@ -25,7 +25,6 @@ steps = 100
 println("Running simulation...")
 
 for t in 1:steps
-
     step!(sim)
 
     if t % 10 == 0
