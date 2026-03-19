@@ -4,11 +4,9 @@ using GLMakie
 using LinearAlgebra
 
 # 1. Initialize Simulation
-n_agents = 500
-world_size = 50.0f0
-cell_size = 5.0f0
-
-sim = init_simulation(n_agents, world_size, cell_size)
+config = load_config("config.toml")
+sim = init_simulation(config)
+world_size = config.world_size
 
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
