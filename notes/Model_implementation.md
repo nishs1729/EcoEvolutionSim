@@ -1,7 +1,5 @@
 # EcoEvolutionSim: Implementation Details
 
-This document describes the implementation of the Eco-Evolutionary Simulation, focusing on how the biological and ecological processes are modeled.
-
 ## 1. The Core Model: Phenotype-Space Ecology
 
 The simulation is built on the principle that every individual agent is defined by a **trait vector** (phenotype). Instead of hard-coding specific behaviors or strategies, behaviors emerge from these traits and their interactions with the environment and other agents.
