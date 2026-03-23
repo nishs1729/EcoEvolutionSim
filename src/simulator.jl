@@ -32,9 +32,8 @@ struct Config
     mating_sigma::Float32
     predation_threshold::Float32
     
-    # Trait indices (placeholder for expansion)
-    # 1: niche/resource preference
-    # ...
+    # Traits from config
+    traits::Dict{String, Any}
 end
 
 function Config(;
@@ -49,19 +48,20 @@ function Config(;
     interaction_radius2 = 1.0f0,
     competition_sigma = 0.2f0,
     mating_sigma = 0.05f0,
-    predation_threshold = 0.3f0
+    predation_threshold = 0.3f0,
+    traits = Dict{String, Any}("resource_preference" => Dict("type" => "continuous"))
 )
     return Config(
         n_agents, world_size, cell_size,
         movement_strategy, base_speed, noise_strength, friction, persistence,
-        interaction_radius2, competition_sigma, mating_sigma, predation_threshold
+        interaction_radius2, competition_sigma, mating_sigma, predation_threshold,
+        traits
     )
 end
 
 function load_config(path::String)
     data = TOML.parsefile(path)
     
-    # Map string strategy to enum
     strategy_map = Dict(
         "RANDOM_WALK" => RANDOM_WALK,
         "LANGEVIN" => LANGEVIN,
@@ -72,6 +72,7 @@ function load_config(path::String)
     sim = data["simulation"]
     mov = data["movement"]
     eco = data["ecology"]
+    traits = get(data, "traits", Dict{String, Any}("resource_preference" => Dict("type" => "continuous")))
     
     return Config(
         n_agents = Int(sim["n_agents"]),
@@ -85,37 +86,47 @@ function load_config(path::String)
         interaction_radius2 = Float32(eco["interaction_radius2"]),
         competition_sigma = Float32(eco["competition_sigma"]),
         mating_sigma = Float32(eco["mating_sigma"]),
-        predation_threshold = Float32(eco["predation_threshold"])
+        predation_threshold = Float32(eco["predation_threshold"]),
+        traits = traits
     )
 end
 
 ############################################################
-# Agent storage (Structure of Arrays)
+# Agent storage (SoA)
 ############################################################
 
 struct Agents
     x::Vector{Float32}
     y::Vector{Float32}
-    
-    # Movement state
     vx::Vector{Float32}
     vy::Vector{Float32}
     theta::Vector{Float32}
-    
-    # Ecological state
-    trait::Vector{Float32}
     energy::Vector{Float32}
+    traits::Dict{String, Vector{Float32}}
+    
+    # For backward compatibility with the single 'trait' vector
+    trait::Vector{Float32}
 end
 
-function Agents(N, world_size)
+function Agents(N, world_size, traits_dict::Dict{String, Vector{Float32}})
+    # For backward compatibility, pick the first trait or use a default
+    default_trait = if haskey(traits_dict, "resource_preference")
+        traits_dict["resource_preference"]
+    elseif !isempty(traits_dict)
+        first(values(traits_dict))
+    else
+        rand(Float32, N)
+    end
+
     return Agents(
         rand(Float32, N) .* world_size,
         rand(Float32, N) .* world_size,
         zeros(Float32, N),
         zeros(Float32, N),
         rand(Float32, N) .* 2f0 .* Float32(pi),
-        rand(Float32, N),
-        ones(Float32, N)
+        ones(Float32, N),
+        traits_dict,
+        default_trait
     )
 end
 
@@ -140,23 +151,37 @@ function CellGrid(ncells, N)
 end
 
 ############################################################
+# Environment state
+############################################################
+
+include("environment.jl")
+using .Environment
+
+############################################################
+# Registries
+############################################################
+
+using .FitnessRegistry
+using .TraitRegistry
+
+############################################################
 # Simulation object
 ############################################################
 
 struct Simulation
     config::Config
     agents::Agents
-    grid::CellGrid
-    neighbor_cells::Vector{Vector{Int}}
-    
-    # Helper fields for convenience
-    nx::Int
-    ny::Int
-    ncells::Int
+    env::EnvironmentState
+    fitness_fn::Function
 end
 
+include("fitness.jl")
+using .Fitness
+include("traits.jl")
+using .Traits
+
 ############################################################
-# Convert position → grid cell
+# Utility: Position → grid cell
 ############################################################
 
 @inline function cell_index(x, y, cell_size, nx)
@@ -166,133 +191,38 @@ end
 end
 
 ############################################################
-# Precompute neighbor cell table
-############################################################
-
-function build_neighbor_table(nx, ny)
-    ncells = nx * ny
-    table = Vector{Vector{Int}}(undef, ncells)
-    for c in 1:ncells
-        iy = (c - 1) ÷ nx + 1
-        ix = c - nx * (iy - 1)
-        list = Int[]
-        for dy in -1:1
-            for dx in -1:1
-                x2 = ix + dx
-                y2 = iy + dy
-                if 1 ≤ x2 ≤ nx && 1 ≤ y2 ≤ ny
-                    push!(list, x2 + nx * (y2 - 1))
-                end
-            end
-        end
-        table[c] = list
-    end
-    return table
-end
-
-############################################################
 # Build spatial cell list
 ############################################################
 
 function build_cell_grid!(sim::Simulation)
     agents = sim.agents
-    grid = sim.grid
-    ncells = sim.ncells
-    cell_size = sim.config.cell_size
-    nx = sim.nx
+    env = sim.env
+    ncells = env.ncells
+    cell_size = env.cell_size
+    nx = env.nx
 
     for c in 1:ncells
-        grid.cell_count[c][] = 0
-        grid.cell_offset[c][] = 0
+        env.grid.cell_count[c][] = 0
+        env.grid.cell_offset[c][] = 0
     end
 
     N = length(agents.x)
 
     Threads.@threads for i in 1:N
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx)
-        Threads.atomic_add!(grid.cell_count[c], 1)
+        Threads.atomic_add!(env.grid.cell_count[c], 1)
     end
 
     s = 1
     for c in 1:ncells
-        grid.cell_start[c] = s
-        s += grid.cell_count[c][]
+        env.grid.cell_start[c] = s
+        s += env.grid.cell_count[c][]
     end
 
     Threads.@threads for i in 1:N
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx)
-        idx = Threads.atomic_add!(grid.cell_offset[c], 1)
-        grid.agent_index[grid.cell_start[c] + idx] = i
-    end
-end
-
-############################################################
-# Ecological interaction kernel
-############################################################
-
-@inline function interaction_kernel!(i, j, sim)
-    agents = sim.agents
-    config = sim.config
-
-    ti = agents.trait[i]
-    tj = agents.trait[j]
-
-    d = ti - tj
-    ad = abs(d)
-
-    # Competition
-    comp = exp(-(ad^2) / (2f0 * config.competition_sigma^2))
-    agents.energy[i] -= 0.01f0 * comp
-    agents.energy[j] -= 0.01f0 * comp
-
-    # Mating
-    mate = exp(-(ad^2) / (2f0 * config.mating_sigma^2))
-    if mate > 0.8f0
-        agents.energy[i] += 0.05f0
-        agents.energy[j] += 0.05f0
-    end
-
-    # Predation
-    if d > config.predation_threshold
-        agents.energy[i] += 0.1f0
-        agents.energy[j] -= 0.1f0
-    elseif d < -config.predation_threshold
-        agents.energy[j] += 0.1f0
-        agents.energy[i] -= 0.1f0
-    end
-end
-
-############################################################
-# Interaction step
-############################################################
-
-function interaction_step!(sim::Simulation)
-    agents = sim.agents
-    grid = sim.grid
-    config = sim.config
-    N = length(agents.x)
-
-    Threads.@threads for i in 1:N
-        xi = agents.x[i]
-        yi = agents.y[i]
-        c = cell_index(xi, yi, config.cell_size, sim.nx)
-
-        for nc in sim.neighbor_cells[c]
-            start = grid.cell_start[nc]
-            stop = start + grid.cell_count[nc][] - 1
-            for k in start:stop
-                j = grid.agent_index[k]
-                if j ≤ i continue end
-
-                dx = agents.x[j] - xi
-                dy = agents.y[j] - yi
-                r2 = dx * dx + dy * dy
-
-                if r2 < config.interaction_radius2
-                    interaction_kernel!(i, j, sim)
-                end
-            end
-        end
+        idx = Threads.atomic_add!(env.grid.cell_offset[c], 1)
+        env.grid.agent_index[env.grid.cell_start[c] + idx] = i
     end
 end
 
@@ -312,25 +242,20 @@ function movement_step!(sim::Simulation)
             agents.y[i] += config.base_speed * (rand(Float32) - 0.5f0)
 
         elseif config.movement_strategy == LANGEVIN
-            # dv = -friction * v * dt + sqrt(2*D*dt) * dW
-            # Here base_speed acts as noise strength for simplicity
             agents.vx[i] = agents.vx[i] * (1f0 - config.friction) + config.noise_strength * (rand(Float32) - 0.5f0)
             agents.vy[i] = agents.vy[i] * (1f0 - config.friction) + config.noise_strength * (rand(Float32) - 0.5f0)
             agents.x[i] += agents.vx[i]
             agents.y[i] += agents.vy[i]
 
         elseif config.movement_strategy == CORRELATED_RW
-            # Change angle slightly
             agents.theta[i] += config.noise_strength * (rand(Float32) - 0.5f0)
             agents.x[i] += config.base_speed * cos(agents.theta[i])
             agents.y[i] += config.base_speed * sin(agents.theta[i])
 
         elseif config.movement_strategy == ACTIVE_BROWNIAN
-            # Constant speed, rotational diffusion
             agents.theta[i] += config.noise_strength * (rand(Float32) - 0.5f0)
             agents.x[i] += config.base_speed * cos(agents.theta[i])
             agents.y[i] += config.base_speed * sin(agents.theta[i])
-            # (In this simple version AB is similar to CRW but usually speed is fixed)
         end
 
         # Reflective boundaries
@@ -365,7 +290,7 @@ end
 
 function step!(sim::Simulation)
     build_cell_grid!(sim)
-    interaction_step!(sim)
+    compute_interactions!(sim, sim.fitness_fn)
     movement_step!(sim)
 end
 
@@ -373,27 +298,60 @@ end
 # Initialization
 ############################################################
 
+function build_neighbor_table(nx, ny)
+    ncells = nx * ny
+    table = Vector{Vector{Int}}(undef, ncells)
+    for c in 1:ncells
+        iy = (c - 1) ÷ nx + 1
+        ix = c - nx * (iy - 1)
+        list = Int[]
+        for dy in -1:1
+            for dx in -1:1
+                x2 = ix + dx
+                y2 = iy + dy
+                if 1 ≤ x2 ≤ nx && 1 ≤ y2 ≤ ny
+                    push!(list, x2 + nx * (y2 - 1))
+                end
+            end
+        end
+        table[c] = list
+    end
+    return table
+end
+
 function init_simulation(config::Config)
     nx = Int(config.world_size / config.cell_size)
     ny = nx
     ncells = nx * ny
 
-    agents = Agents(config.n_agents, config.world_size)
+    # Initialize traits from registry
+    traits_dict = Dict{String, Vector{Float32}}()
+    for (trait_name, trait_config) in config.traits
+        trait_type = trait_config["type"]
+        trait_constructor = TRAIT_REGISTRY[trait_type]
+        # For 'bounded', pass extra args if they exist
+        if trait_type == "bounded"
+            min_val = Float32(get(trait_config, "min", 0.0f0))
+            max_val = Float32(get(trait_config, "max", 1.0f0))
+            traits_dict[trait_name] = trait_constructor(config.n_agents, min_val, max_val)
+        else
+            traits_dict[trait_name] = trait_constructor(config.n_agents)
+        end
+    end
+
+    agents = Agents(config.n_agents, config.world_size, traits_dict)
     neighbor_table = build_neighbor_table(nx, ny)
     grid = CellGrid(ncells, config.n_agents)
+    
+    env = EnvironmentState(config, grid, neighbor_table, nx, ny, ncells)
 
-    return Simulation(
-        config,
-        agents,
-        grid,
-        neighbor_table,
-        nx,
-        ny,
-        ncells
-    )
+    fitness_name = "default_interaction"
+    fitness_constructor = FITNESS_REGISTRY[fitness_name]
+    fitness_fn = fitness_constructor(config)
+
+    return Simulation(config, agents, env, fitness_fn)
 end
 
-# Backward compatibility or convenience
 function init_simulation(N, world_size, cell_size)
     config = Config(n_agents=N, world_size=world_size, cell_size=cell_size)
     return init_simulation(config)

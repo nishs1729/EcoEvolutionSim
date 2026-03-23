@@ -11,7 +11,8 @@ using Random
         @test config.movement_strategy == EcoEvolutionSim.LANGEVIN
         
         # Test loading from file
-        loaded = load_config("config.toml")
+        config_path = joinpath(@__DIR__, "..", "config.toml")
+        loaded = load_config(config_path)
         @test loaded.n_agents == 500
         @test loaded.world_size == 50.0f0
         @test loaded.movement_strategy == EcoEvolutionSim.LANGEVIN
@@ -30,9 +31,9 @@ using Random
         
         @test sim.config.world_size == world_size
         @test sim.config.cell_size == cell_size
-        @test sim.nx == 10
-        @test sim.ny == 10
-        @test sim.ncells == 100
+        @test sim.env.nx == 10
+        @test sim.env.ny == 10
+        @test sim.env.ncells == 100
         
         @test all(0.0 .<= sim.agents.x .<= world_size)
         @test all(0.0 .<= sim.agents.y .<= world_size)
@@ -113,7 +114,7 @@ using Random
         sim.agents.energy .= 1.0f0
         
         EcoEvolutionSim.build_cell_grid!(sim)
-        EcoEvolutionSim.interaction_step!(sim)
+        EcoEvolutionSim.compute_interactions!(sim)
         
         @test sim.agents.energy[1] > 1.0f0 # Net increase
         
@@ -123,7 +124,7 @@ using Random
         sim.agents.energy .= 1.0f0
         
         EcoEvolutionSim.build_cell_grid!(sim)
-        EcoEvolutionSim.interaction_step!(sim)
+        EcoEvolutionSim.compute_interactions!(sim)
         
         @test sim.agents.energy[1] > 1.0f0
         @test sim.agents.energy[2] < 1.0f0

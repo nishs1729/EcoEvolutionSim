@@ -1,7 +1,5 @@
-using Revise
 using EcoEvolutionSim
 using GLMakie
-using LinearAlgebra
 
 # 1. Initialize Simulation
 config = load_config("config.toml")
@@ -11,7 +9,7 @@ world_size = config.world_size
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
 traits = Observable(sim.agents.trait)
-energies = Observable(sim.agents.energy .* 10.0f0) # Scale energy for markersize
+energies = Observable(sim.agents.energy) # Scale energy for markersize
 interaction_segments = Observable(Point2f[])
 
 # 3. Setup Figure
@@ -29,7 +27,7 @@ scatter!(ax, points,
          color = traits, 
          colormap = :viridis, 
          colorrange = (0, 1),
-         markersize = 10)
+         markersize = energies)
 
 # Colorbar for traits
 Colorbar(fig[1, 2], label = "Trait Value", colormap = :viridis, limits = (0, 1))
@@ -40,27 +38,27 @@ display(fig)
 function get_interaction_segments(sim)
     segments = Point2f[]
     agents = sim.agents
-    grid = sim.grid
     N = length(agents.x)
+    env = sim.env
     
     for i in 1:N
         xi, yi = agents.x[i], agents.y[i]
-        c = cell_index(xi, yi, sim.cell_size, sim.nx)
+        c = cell_index(xi, yi, env.cell_size, env.nx)
         
         # Check current and neighbor cells
-        for nc in sim.neighbor_cells[c]
-            start = grid.cell_start[nc]
-            stop = start + grid.cell_count[nc][] - 1
+        for nc in env.neighbor_cells[c]
+            start = env.grid.cell_start[nc]
+            stop = start + env.grid.cell_count[nc][] - 1
             
             for k in start:stop
-                j = grid.agent_index[k]
+                j = env.grid.agent_index[k]
                 if j <= i continue end
                 
                 dx = agents.x[j] - xi
                 dy = agents.y[j] - yi
                 
                 r2 = dx*dx + dy*dy
-                if r2 < sim.interaction_radius2
+                if r2 < sim.config.interaction_radius2
                     push!(segments, Point2f(agents.x[i], agents.y[i]))
                     push!(segments, Point2f(agents.x[j], agents.y[j]))
                 end
@@ -74,7 +72,7 @@ end
 function update_visuals!(sim, points, traits, energies, interaction_segments)
     points[] = Point2f.(sim.agents.x, sim.agents.y)
     traits[] = sim.agents.trait
-    energies[] = sim.agents.energy
+    energies[] = sim.agents.energy .* 10.0f0
     interaction_segments[] = get_interaction_segments(sim)
 end
 
