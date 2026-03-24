@@ -39,8 +39,20 @@ end
     sim::SimConfig = SimConfig()
     mov::MovConfig = MovConfig()
     eco::EcoConfig = EcoConfig()
-    traits::Dict{String, Any} = Dict{String, Any}("resource_preference" => Dict("type" => "continuous"))
+    traits::Dict{String, Dict{String,Any}} = Dict{String, Any}("resource_preference" => Dict("type" => "continuous"))
 end
+
+function Configurations.from_dict(::Type{MovementStrategy}, x::String)
+    s = Symbol(uppercase(x))
+    for i in instances(MovementStrategy)
+        if Symbol(i) == s
+            return i
+        end
+    end
+    error("'$x' is not a valid MovementStrategy. Options: $(instances(MovementStrategy))")
+end
+
+Base.convert(::Type{MovementStrategy}, x::String) = Configurations.from_dict(MovementStrategy, x)
 
 function load_config(path::String)
     return from_toml(Config, path)
@@ -58,9 +70,6 @@ struct Agents
     theta::Vector{Float32}
     energy::Vector{Float32}
     traits::Dict{String, Vector{Float32}}
-    
-    # For backward compatibility with the single 'trait' vector
-    trait::Vector{Float32}
 end
 
 function Agents(N, world_size, traits_dict::Dict{String, Vector{Float32}})

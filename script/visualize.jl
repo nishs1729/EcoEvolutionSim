@@ -1,3 +1,4 @@
+using Revise
 using EcoEvolutionSim
 using GLMakie
 

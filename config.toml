@@ -1,11 +1,11 @@
 # EcoEvolutionSim Configuration
 
-[simulation]
+[sim]
 n_agents = 500
 world_size = 50.0
 cell_size = 5.0
 
-[movement]
+[mov]
 # Strategies: RANDOM_WALK, LANGEVIN, CORRELATED_RW, ACTIVE_BROWNIAN
 strategy = "LANGEVIN"
 base_speed = 0.1
@@ -13,7 +13,7 @@ noise_strength = 0.1
 friction = 0.1
 persistence = 0.8
 
-[ecology]
+[eco]
 interaction_radius2 = 1.0
 competition_sigma = 0.2
 mating_sigma = 0.05
