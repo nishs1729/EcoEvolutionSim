@@ -21,8 +21,8 @@ end
 
 function EnvironmentState(config::Config, grid::CellGrid, neighbor_cells::Vector{Vector{Int}}, nx::Int, ny::Int, ncells::Int)
     return EnvironmentState(
-        config.world_size,
-        config.cell_size,
+        config.sim.world_size,
+        config.sim.cell_size,
         grid,
         neighbor_cells,
         nx,

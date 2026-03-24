@@ -1,6 +1,7 @@
 using Base.Threads
 using Random
 using TOML
+using Configurations
 
 ############################################################
 # Configuration and Models
@@ -13,82 +14,36 @@ using TOML
     ACTIVE_BROWNIAN = 4
 end
 
-struct Config
-    # Simulation settings
-    n_agents::Int
-    world_size::Float32
-    cell_size::Float32
-    
-    # Movement settings
-    movement_strategy::MovementStrategy
-    base_speed::Float32
-    noise_strength::Float32
-    friction::Float32 # For Langevin
-    persistence::Float32 # For Correlated RW
-    
-    # Ecological settings
-    interaction_radius2::Float32
-    competition_sigma::Float32
-    mating_sigma::Float32
-    predation_threshold::Float32
-    
-    # Traits from config
-    traits::Dict{String, Any}
+@option struct SimConfig
+    n_agents::Int = 500
+    world_size::Float32 = 50.0f0
+    cell_size::Float32 = 5.0f0
 end
 
-function Config(;
-    n_agents = 500,
-    world_size = 50.0f0,
-    cell_size = 5.0f0,
-    movement_strategy = RANDOM_WALK,
-    base_speed = 0.1f0,
-    noise_strength = 0.1f0,
-    friction = 0.1f0,
-    persistence = 0.8f0,
-    interaction_radius2 = 1.0f0,
-    competition_sigma = 0.2f0,
-    mating_sigma = 0.05f0,
-    predation_threshold = 0.3f0,
-    traits = Dict{String, Any}("resource_preference" => Dict("type" => "continuous"))
-)
-    return Config(
-        n_agents, world_size, cell_size,
-        movement_strategy, base_speed, noise_strength, friction, persistence,
-        interaction_radius2, competition_sigma, mating_sigma, predation_threshold,
-        traits
-    )
+@option struct MovConfig
+    strategy::MovementStrategy = RANDOM_WALK
+    base_speed::Float32 = 0.1f0
+    noise_strength::Float32 = 0.1f0
+    friction::Float32 = 0.1f0 # For Langevin
+    persistence::Float32 = 0.8f0 # For Correlated RW
+end
+
+@option struct EcoConfig
+    interaction_radius2::Float32 = 1.0f0
+    competition_sigma::Float32 = 0.2f0
+    mating_sigma::Float32 = 0.05f0
+    predation_threshold::Float32 = 0.3f0
+end
+
+@option struct Config
+    sim::SimConfig = SimConfig()
+    mov::MovConfig = MovConfig()
+    eco::EcoConfig = EcoConfig()
+    traits::Dict{String, Any} = Dict{String, Any}("resource_preference" => Dict("type" => "continuous"))
 end
 
 function load_config(path::String)
-    data = TOML.parsefile(path)
-    
-    strategy_map = Dict(
-        "RANDOM_WALK" => RANDOM_WALK,
-        "LANGEVIN" => LANGEVIN,
-        "CORRELATED_RW" => CORRELATED_RW,
-        "ACTIVE_BROWNIAN" => ACTIVE_BROWNIAN
-    )
-    
-    sim = data["simulation"]
-    mov = data["movement"]
-    eco = data["ecology"]
-    traits = get(data, "traits", Dict{String, Any}("resource_preference" => Dict("type" => "continuous")))
-    
-    return Config(
-        n_agents = Int(sim["n_agents"]),
-        world_size = Float32(sim["world_size"]),
-        cell_size = Float32(sim["cell_size"]),
-        movement_strategy = strategy_map[mov["strategy"]],
-        base_speed = Float32(mov["base_speed"]),
-        noise_strength = Float32(mov["noise_strength"]),
-        friction = Float32(mov["friction"]),
-        persistence = Float32(mov["persistence"]),
-        interaction_radius2 = Float32(eco["interaction_radius2"]),
-        competition_sigma = Float32(eco["competition_sigma"]),
-        mating_sigma = Float32(eco["mating_sigma"]),
-        predation_threshold = Float32(eco["predation_threshold"]),
-        traits = traits
-    )
+    return from_toml(Config, path)
 end
 
 ############################################################
@@ -233,29 +188,29 @@ end
 function movement_step!(sim::Simulation)
     agents = sim.agents
     config = sim.config
-    world = config.world_size
+    world = config.sim.world_size
     N = length(agents.x)
 
     Threads.@threads for i in 1:N
-        if config.movement_strategy == RANDOM_WALK
-            agents.x[i] += config.base_speed * (rand(Float32) - 0.5f0)
-            agents.y[i] += config.base_speed * (rand(Float32) - 0.5f0)
+        if config.mov.strategy == RANDOM_WALK
+            agents.x[i] += config.mov.base_speed * (rand(Float32) - 0.5f0)
+            agents.y[i] += config.mov.base_speed * (rand(Float32) - 0.5f0)
 
-        elseif config.movement_strategy == LANGEVIN
-            agents.vx[i] = agents.vx[i] * (1f0 - config.friction) + config.noise_strength * (rand(Float32) - 0.5f0)
-            agents.vy[i] = agents.vy[i] * (1f0 - config.friction) + config.noise_strength * (rand(Float32) - 0.5f0)
+        elseif config.mov.strategy == LANGEVIN
+            agents.vx[i] = agents.vx[i] * (1f0 - config.mov.friction) + config.mov.noise_strength * (rand(Float32) - 0.5f0)
+            agents.vy[i] = agents.vy[i] * (1f0 - config.mov.friction) + config.mov.noise_strength * (rand(Float32) - 0.5f0)
             agents.x[i] += agents.vx[i]
             agents.y[i] += agents.vy[i]
 
-        elseif config.movement_strategy == CORRELATED_RW
-            agents.theta[i] += config.noise_strength * (rand(Float32) - 0.5f0)
-            agents.x[i] += config.base_speed * cos(agents.theta[i])
-            agents.y[i] += config.base_speed * sin(agents.theta[i])
+        elseif config.mov.strategy == CORRELATED_RW
+            agents.theta[i] += config.mov.noise_strength * (rand(Float32) - 0.5f0)
+            agents.x[i] += config.mov.base_speed * cos(agents.theta[i])
+            agents.y[i] += config.mov.base_speed * sin(agents.theta[i])
 
-        elseif config.movement_strategy == ACTIVE_BROWNIAN
-            agents.theta[i] += config.noise_strength * (rand(Float32) - 0.5f0)
-            agents.x[i] += config.base_speed * cos(agents.theta[i])
-            agents.y[i] += config.base_speed * sin(agents.theta[i])
+        elseif config.mov.strategy == ACTIVE_BROWNIAN
+            agents.theta[i] += config.mov.noise_strength * (rand(Float32) - 0.5f0)
+            agents.x[i] += config.mov.base_speed * cos(agents.theta[i])
+            agents.y[i] += config.mov.base_speed * sin(agents.theta[i])
         end
 
         # Reflective boundaries
@@ -320,7 +275,7 @@ function build_neighbor_table(nx, ny)
 end
 
 function init_simulation(config::Config)
-    nx = Int(config.world_size / config.cell_size)
+    nx = Int(config.sim.world_size / config.sim.cell_size)
     ny = nx
     ncells = nx * ny
 
@@ -333,15 +288,15 @@ function init_simulation(config::Config)
         if trait_type == "bounded"
             min_val = Float32(get(trait_config, "min", 0.0f0))
             max_val = Float32(get(trait_config, "max", 1.0f0))
-            traits_dict[trait_name] = trait_constructor(config.n_agents, min_val, max_val)
+            traits_dict[trait_name] = trait_constructor(config.sim.n_agents, min_val, max_val)
         else
-            traits_dict[trait_name] = trait_constructor(config.n_agents)
+            traits_dict[trait_name] = trait_constructor(config.sim.n_agents)
         end
     end
 
-    agents = Agents(config.n_agents, config.world_size, traits_dict)
+    agents = Agents(config.sim.n_agents, config.sim.world_size, traits_dict)
     neighbor_table = build_neighbor_table(nx, ny)
-    grid = CellGrid(ncells, config.n_agents)
+    grid = CellGrid(ncells, config.sim.n_agents)
     
     env = EnvironmentState(config, grid, neighbor_table, nx, ny, ncells)
 
@@ -353,6 +308,6 @@ function init_simulation(config::Config)
 end
 
 function init_simulation(N, world_size, cell_size)
-    config = Config(n_agents=N, world_size=world_size, cell_size=cell_size)
+    config = Config(sim=SimConfig(n_agents=N, world_size=world_size, cell_size=cell_size))
     return init_simulation(config)
 end

@@ -4,7 +4,7 @@ using GLMakie
 # 1. Initialize Simulation
 config = load_config("config.toml")
 sim = init_simulation(config)
-world_size = config.world_size
+world_size = config.sim.world_size
 
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
@@ -58,7 +58,7 @@ function get_interaction_segments(sim)
                 dy = agents.y[j] - yi
                 
                 r2 = dx*dx + dy*dy
-                if r2 < sim.config.interaction_radius2
+                if r2 < sim.config.eco.interaction_radius2
                     push!(segments, Point2f(agents.x[i], agents.y[i]))
                     push!(segments, Point2f(agents.x[j], agents.y[j]))
                 end
@@ -84,7 +84,7 @@ try
             step!(sim)
         end
         update_visuals!(sim, points, traits, energies, interaction_segments)
-        sleep(0.01)
+        sleep(0.02)
     end
 catch e
     if !(e isa InterruptException)

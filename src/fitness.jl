@@ -23,22 +23,22 @@ end
     ad = abs(d)
 
     # Competition
-    comp = exp(-(ad^2) / (2f0 * config.competition_sigma^2))
+    comp = exp(-(ad^2) / (2f0 * config.eco.competition_sigma^2))
     agents.energy[i] -= 0.01f0 * comp
     agents.energy[j] -= 0.01f0 * comp
 
     # Mating
-    mate = exp(-(ad^2) / (2f0 * config.mating_sigma^2))
+    mate = exp(-(ad^2) / (2f0 * config.eco.mating_sigma^2))
     if mate > 0.8f0
         agents.energy[i] += 0.05f0
         agents.energy[j] += 0.05f0
     end
 
     # Predation
-    if d > config.predation_threshold
+    if d > config.eco.predation_threshold
         agents.energy[i] += 0.1f0
         agents.energy[j] -= 0.1f0
-    elseif d < -config.predation_threshold
+    elseif d < -config.eco.predation_threshold
         agents.energy[j] += 0.1f0
         agents.energy[i] -= 0.1f0
     end
@@ -77,7 +77,7 @@ function compute_interactions!(sim::Simulation, kernel! = default_interaction_ke
                 dy = agents.y[j] - yi
                 r2 = dx * dx + dy * dy
 
-                if r2 < config.interaction_radius2
+                if r2 < config.eco.interaction_radius2
                     kernel!(i, j, sim)
                 end
             end

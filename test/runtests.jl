@@ -5,17 +5,17 @@ using Random
 @testset "EcoEvolutionSim.jl" begin
 
     @testset "Configuration" begin
-        config = Config(n_agents=200, world_size=100.0f0, movement_strategy=EcoEvolutionSim.LANGEVIN)
-        @test config.n_agents == 200
-        @test config.world_size == 100.0f0
-        @test config.movement_strategy == EcoEvolutionSim.LANGEVIN
+        config = Config(sim=SimConfig(n_agents=200, world_size=100.0f0), mov=MovConfig(strategy=EcoEvolutionSim.LANGEVIN))
+        @test config.sim.n_agents == 200
+        @test config.sim.world_size == 100.0f0
+        @test config.mov.strategy == EcoEvolutionSim.LANGEVIN
         
         # Test loading from file
         config_path = joinpath(@__DIR__, "..", "config.toml")
         loaded = load_config(config_path)
-        @test loaded.n_agents == 500
-        @test loaded.world_size == 50.0f0
-        @test loaded.movement_strategy == EcoEvolutionSim.LANGEVIN
+        @test loaded.sim.n_agents == 500
+        @test loaded.sim.world_size == 50.0f0
+        @test loaded.mov.strategy == EcoEvolutionSim.LANGEVIN
     end
 
     @testset "Initialization" begin
@@ -29,8 +29,8 @@ using Random
         @test length(sim.agents.trait) == N
         @test length(sim.agents.energy) == N
         
-        @test sim.config.world_size == world_size
-        @test sim.config.cell_size == cell_size
+        @test sim.config.sim.world_size == world_size
+        @test sim.config.sim.cell_size == cell_size
         @test sim.env.nx == 10
         @test sim.env.ny == 10
         @test sim.env.ncells == 100
@@ -48,7 +48,7 @@ using Random
         for strategy in [EcoEvolutionSim.RANDOM_WALK, EcoEvolutionSim.LANGEVIN, 
                          EcoEvolutionSim.CORRELATED_RW, EcoEvolutionSim.ACTIVE_BROWNIAN]
             
-            config = Config(n_agents=N, world_size=world_size, movement_strategy=strategy)
+            config = Config(sim=SimConfig(n_agents=N, world_size=world_size), mov=MovConfig(strategy=strategy))
             sim = init_simulation(config)
             
             # Initial positions
@@ -70,7 +70,7 @@ using Random
         # Specifically test reflection logic
         N = 1
         world_size = 10.0f0
-        config = Config(n_agents=N, world_size=world_size, movement_strategy=EcoEvolutionSim.LANGEVIN, noise_strength=5.0f0)
+        config = Config(sim=SimConfig(n_agents=N, world_size=world_size), mov=MovConfig(strategy=EcoEvolutionSim.LANGEVIN, noise_strength=5.0f0))
         sim = init_simulation(config)
         
         # Force agent to boundary
@@ -102,7 +102,7 @@ using Random
         N = 2
         world_size = 10.0f0
         cell_size = 10.0f0
-        config = Config(n_agents=N, world_size=world_size, cell_size=cell_size)
+        config = Config(sim=SimConfig(n_agents=N, world_size=world_size, cell_size=cell_size))
         sim = init_simulation(config)
         
         sim.agents.x[1], sim.agents.y[1] = 5.0f0, 5.0f0
