@@ -6,6 +6,7 @@ using Configurations
 ############################################################
 # Configuration and Models
 ############################################################
+const THREAD_RNG = [Random.Xoshiro() for _ in 1:Threads.nthreads()]
 
 @enum MovementStrategy begin
     RANDOM_WALK = 1
@@ -89,7 +90,7 @@ struct CellGrid
     cell_start::Vector{Int}
     cell_count::Vector{Threads.Atomic{Int}}
     cell_offset::Vector{Threads.Atomic{Int}}
-    agent_index::Vector{Int}
+    agent_index::Vector{Int32}
 end
 
 function CellGrid(ncells, N)
@@ -97,7 +98,7 @@ function CellGrid(ncells, N)
         zeros(Int, ncells),
         [Threads.Atomic{Int}(0) for _ in 1:ncells],
         [Threads.Atomic{Int}(0) for _ in 1:ncells],
-        Vector{Int}(undef, N)
+        Vector{Int32}(undef, N)
     )
 end
 
@@ -111,6 +112,7 @@ struct EnvironmentState
     ny::Int
     cell_size::Float32
     grid::CellGrid
+    neighbors::Vector{Vector{Int}}
 end
 
 struct Simulation{F}
@@ -215,15 +217,15 @@ function movement_random_walk!(sim::Simulation)
     N = length(x)
 
     Threads.@threads for i in 1:N
-        rng = Random.default_rng()
-
-        xi = x[i] + speed * (rand(rng, Float32) - 0.5f0)
-        yi = y[i] + speed * (rand(rng, Float32) - 0.5f0)
-
-        xi, vxi = reflect!(xi, vx[i], world)
-        yi, vyi = reflect!(yi, vy[i], world)
-
         @inbounds begin
+            rng = THREAD_RNG[threadid()]
+
+            xi = x[i] + speed * (rand(rng, Float32) - 0.5f0)
+            yi = y[i] + speed * (rand(rng, Float32) - 0.5f0)
+
+            xi, vxi = reflect!(xi, vx[i], world)
+            yi, vyi = reflect!(yi, vy[i], world)
+
             x[i] = clamp(xi,0f0,world)
             y[i] = clamp(yi,0f0,world)
             vx[i] = vxi
@@ -249,18 +251,18 @@ function movement_langevin!(sim::Simulation)
     N = length(x)
 
     Threads.@threads for i in 1:N
-        rng = Random.default_rng()
-
-        vxi = vx[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
-        vyi = vy[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
-
-        xi = x[i] + vxi
-        yi = y[i] + vyi
-
-        xi, vxi = reflect!(xi, vxi, world)
-        yi, vyi = reflect!(yi, vyi, world)
-
         @inbounds begin
+            rng = THREAD_RNG[threadid()]
+
+            vxi = vx[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
+            vyi = vy[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
+
+            xi = x[i] + vxi
+            yi = y[i] + vyi
+
+            xi, vxi = reflect!(xi, vxi, world)
+            yi, vyi = reflect!(yi, vyi, world)
+
             x[i] = clamp(xi,0f0,world)
             y[i] = clamp(yi,0f0,world)
             vx[i] = vxi
@@ -285,22 +287,22 @@ function movement_correlated_rw!(sim::Simulation)
     N = length(x)
 
     Threads.@threads for i in 1:N
-        rng = Random.default_rng()
-
-        θ = theta[i] + noise*(rand(rng,Float32)-0.5f0)
-
-        xi = x[i] + speed*cos(θ)
-        yi = y[i] + speed*sin(θ)
-
-        if xi < 0f0 || xi > world
-            θ = π - θ
-        end
-
-        if yi < 0f0 || yi > world
-            θ = -θ
-        end
-
         @inbounds begin
+            rng = THREAD_RNG[threadid()]
+
+            θ = theta[i] + noise*(rand(rng,Float32)-0.5f0)
+
+            xi = x[i] + speed*cos(θ)
+            yi = y[i] + speed*sin(θ)
+
+            if xi < 0f0 || xi > world
+                θ = π - θ
+            end
+
+            if yi < 0f0 || yi > world
+                θ = -θ
+            end
+
             theta[i] = mod(θ,2f0*π)
             x[i] = clamp(xi,0f0,world)
             y[i] = clamp(yi,0f0,world)
@@ -324,22 +326,22 @@ function movement_active_brownian!(sim::Simulation)
     N = length(x)
 
     Threads.@threads for i in 1:N
-        rng = Random.default_rng()
-
-        θ = theta[i] + noise*(randn(rng,Float32))
-
-        xi = x[i] + speed*cos(θ)
-        yi = y[i] + speed*sin(θ)
-
-        if xi < 0f0 || xi > world
-            θ = π - θ
-        end
-
-        if yi < 0f0 || yi > world
-            θ = -θ
-        end
-
         @inbounds begin
+            rng = THREAD_RNG[threadid()]
+
+            θ = theta[i] + noise*(randn(rng,Float32))
+
+            xi = x[i] + speed*cos(θ)
+            yi = y[i] + speed*sin(θ)
+
+            if xi < 0f0 || xi > world
+                θ = π - θ
+            end
+
+            if yi < 0f0 || yi > world
+                θ = -θ
+            end
+
             theta[i] = mod(θ,2f0*π)
             x[i] = clamp(xi,0f0,world)
             y[i] = clamp(yi,0f0,world)
@@ -389,7 +391,9 @@ function initialize_traits(specs::Dict{String, TraitSpec}, n_agents)
     for (name, spec) in specs
         randn!(buffer)
         v = similar(buffer)
-        v .= spec.mean .+ spec.sigma .* buffer
+        @inbounds @simd for i in eachindex(buffer)
+            v[i] = spec.mean + spec.sigma*buffer[i]
+        end
         traits[name] = v
     end
 
@@ -406,7 +410,7 @@ function init_simulation(config_path::String = "config.toml")
     agents = Agents(config.n_agents, config.world_size, traits_dict)
     neighbor_table = build_neighbor_table(nx, ny)
     grid = CellGrid(ncells, config.n_agents)
-    env = EnvironmentState(ncells, nx, ny, config.cell_size, grid)
+    env = EnvironmentState(ncells, nx, ny, config.cell_size, grid, neighbor_table)
     movement_kernel = select_movement_kernel(config.strategy)
 
     return Simulation(config, agents, env, movement_kernel)
