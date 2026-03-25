@@ -6,7 +6,6 @@ using Configurations
 ############################################################
 # Configuration and Models
 ############################################################
-const THREAD_RNG = [Random.Xoshiro() for _ in 1:Threads.nthreads()]
 
 @enum MovementStrategy begin
     RANDOM_WALK = 1
@@ -151,7 +150,6 @@ function build_cell_grid!(sim::Simulation)
     N = length(agents.x)
 
     Threads.@threads for i in 1:N
-        # c = cell_index(agents.x[i], agents.y[i], cell_size, nx)
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
         Threads.atomic_add!(env.grid.cell_count[c], 1)
     end
@@ -163,7 +161,6 @@ function build_cell_grid!(sim::Simulation)
     end
 
     Threads.@threads for i in 1:N
-        # c = cell_index(agents.x[i], agents.y[i], cell_size, nx)
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
         idx = Threads.atomic_add!(env.grid.cell_offset[c], 1)
         env.grid.agent_index[env.grid.cell_start[c] + idx] = i
@@ -174,7 +171,6 @@ end
 # Movement step
 ############################################################
 function select_movement_kernel(strategy::MovementStrategy)
-
     if strategy == RANDOM_WALK
         return movement_random_walk!
     elseif strategy == LANGEVIN
@@ -186,7 +182,6 @@ function select_movement_kernel(strategy::MovementStrategy)
     else
         error("Unknown movement strategy: $strategy")
     end
-
 end
 
 function movement_step!(sim::Simulation)
@@ -208,26 +203,29 @@ function movement_random_walk!(sim::Simulation)
     config = sim.config
     world = config.world_size
     speed = config.base_speed
+    half = 0.5f0 * speed
 
     x = agents.x
     y = agents.y
     vx = agents.vx
     vy = agents.vy
 
-    N = length(x)
-
-    Threads.@threads for i in 1:N
+    Threads.@threads for i in eachindex(x)
+        rng = Random.default_rng()
         @inbounds begin
-            rng = THREAD_RNG[threadid()]
+            xi = x[i]
+            yi = y[i]
+            vxi = vx[i]
+            vyi = vy[i]
 
-            xi = x[i] + speed * (rand(rng, Float32) - 0.5f0)
-            yi = y[i] + speed * (rand(rng, Float32) - 0.5f0)
+            xi += rand(rng,Float32)*speed - half
+            yi += rand(rng,Float32)*speed - half
 
-            xi, vxi = reflect!(xi, vx[i], world)
-            yi, vyi = reflect!(yi, vy[i], world)
+            xi, vxi = reflect!(xi, vxi, world)
+            yi, vyi = reflect!(yi, vyi, world)
 
-            x[i] = clamp(xi,0f0,world)
-            y[i] = clamp(yi,0f0,world)
+            x[i] = xi
+            y[i] = yi
             vx[i] = vxi
             vy[i] = vyi
         end
@@ -243,28 +241,34 @@ function movement_langevin!(sim::Simulation)
     noise = config.noise_strength
     friction = config.friction
 
+    damp = 1f0 - friction
+    halfnoise = 0.5f0 * noise
+
     x = agents.x
     y = agents.y
     vx = agents.vx
     vy = agents.vy
 
-    N = length(x)
-
-    Threads.@threads for i in 1:N
+    Threads.@threads for i in eachindex(x)
+        rng = Random.default_rng()
         @inbounds begin
-            rng = THREAD_RNG[threadid()]
 
-            vxi = vx[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
-            vyi = vy[i]*(1f0 - friction) + noise*(rand(rng,Float32)-0.5f0)
+            xi = x[i]
+            yi = y[i]
+            vxi = vx[i]
+            vyi = vy[i]
 
-            xi = x[i] + vxi
-            yi = y[i] + vyi
+            vxi = vxi*damp + noise*rand(rng,Float32) - halfnoise
+            vyi = vyi*damp + noise*rand(rng,Float32) - halfnoise
+
+            xi += vxi
+            yi += vyi
 
             xi, vxi = reflect!(xi, vxi, world)
             yi, vyi = reflect!(yi, vyi, world)
 
-            x[i] = clamp(xi,0f0,world)
-            y[i] = clamp(yi,0f0,world)
+            x[i] = xi
+            y[i] = yi
             vx[i] = vxi
             vy[i] = vyi
         end
@@ -280,32 +284,39 @@ function movement_correlated_rw!(sim::Simulation)
     noise = config.noise_strength
     speed = config.base_speed
 
+    halfnoise = 0.5f0 * noise
+    π32 = Float32(π)
+    twopi = 2f0 * π32
+
     x = agents.x
     y = agents.y
     theta = agents.theta
 
-    N = length(x)
-
-    Threads.@threads for i in 1:N
+    Threads.@threads for i in eachindex(x)
+        rng = Random.default_rng()
         @inbounds begin
-            rng = THREAD_RNG[threadid()]
 
-            θ = theta[i] + noise*(rand(rng,Float32)-0.5f0)
+            xi = x[i]
+            yi = y[i]
+            θ = theta[i]
 
-            xi = x[i] + speed*cos(θ)
-            yi = y[i] + speed*sin(θ)
+            θ += noise*rand(rng,Float32) - halfnoise
+
+            s,c = sincos(θ)
+            xi += speed*c
+            yi += speed*s
 
             if xi < 0f0 || xi > world
-                θ = π - θ
+                θ = π32 - θ
             end
 
             if yi < 0f0 || yi > world
                 θ = -θ
             end
 
-            theta[i] = mod(θ,2f0*π)
-            x[i] = clamp(xi,0f0,world)
-            y[i] = clamp(yi,0f0,world)
+            theta[i] = mod(θ,twopi)
+            x[i] = xi
+            y[i] = yi
         end
     end
 end
@@ -319,32 +330,38 @@ function movement_active_brownian!(sim::Simulation)
     noise = config.noise_strength
     speed = config.base_speed
 
+    π32 = Float32(π)
+    twopi = 2f0 * π32
+
     x = agents.x
     y = agents.y
     theta = agents.theta
 
-    N = length(x)
-
-    Threads.@threads for i in 1:N
+    Threads.@threads for i in eachindex(x)
+        rng = Random.default_rng()
         @inbounds begin
-            rng = THREAD_RNG[threadid()]
 
-            θ = theta[i] + noise*(randn(rng,Float32))
+            xi = x[i]
+            yi = y[i]
+            θ = theta[i]
 
-            xi = x[i] + speed*cos(θ)
-            yi = y[i] + speed*sin(θ)
+            θ += noise * randn(rng,Float32)
+
+            s,c = sincos(θ)
+            xi += speed*c
+            yi += speed*s
 
             if xi < 0f0 || xi > world
-                θ = π - θ
+                θ = π32 - θ
             end
 
             if yi < 0f0 || yi > world
                 θ = -θ
             end
 
-            theta[i] = mod(θ,2f0*π)
-            x[i] = clamp(xi,0f0,world)
-            y[i] = clamp(yi,0f0,world)
+            theta[i] = mod(θ,twopi)
+            x[i] = xi
+            y[i] = yi
         end
     end
 end
