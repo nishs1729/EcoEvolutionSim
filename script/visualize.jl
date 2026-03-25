@@ -1,33 +1,31 @@
 using Revise
 using EcoEvolutionSim
+using Random
 using GLMakie
 
 # 1. Initialize Simulation
-config = load_config("config.toml")
-sim = init_simulation(config)
-world_size = config.sim.world_size
+sim = init_simulation("config.toml")
 
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
-traits = Observable(sim.agents.trait)
-energies = Observable(sim.agents.energy) # Scale energy for markersize
-interaction_segments = Observable(Point2f[])
+energies = Observable(sim.agents.energy .* 10.0f0) # Scale energy for markersize
+
+color_trait_name = "fecundity"
+color_trait = Observable(sim.agents.traits[color_trait_name])
 
 # 3. Setup Figure
 fig = Figure(size = (800, 800))
 ax = Axis(fig[1, 1], title = "Eco-Evolutionary Simulation (Reflective Boundaries)",
           aspect = DataAspect(), 
-          limits = (0, world_size, 0, world_size))
+          limits = (0, config.world_size, 0, config.world_size))
 
 # 4. Plotting
-# Interaction lines (like bonds)
-linesegments!(ax, interaction_segments, color = (:gray, 0.2), linewidth = 1)
-
 # Agents
-scatter!(ax, points, 
-         color = traits, 
+scatter!(ax, points,
+         color = color_trait, 
          colormap = :viridis, 
-         colorrange = (0, 1),
+         colorrange = (TRAIT_SPECS[color_trait_name].mean - 3.0f0 * TRAIT_SPECS[color_trait_name].sigma, 
+                       TRAIT_SPECS[color_trait_name].mean + 3.0f0 * TRAIT_SPECS[color_trait_name].sigma),
          markersize = energies)
 
 # Colorbar for traits
@@ -35,60 +33,26 @@ Colorbar(fig[1, 2], label = "Trait Value", colormap = :viridis, limits = (0, 1))
 
 display(fig)
 
-# 5. Interaction detection for visualization
-function get_interaction_segments(sim)
-    segments = Point2f[]
-    agents = sim.agents
-    N = length(agents.x)
-    env = sim.env
-    
-    for i in 1:N
-        xi, yi = agents.x[i], agents.y[i]
-        c = cell_index(xi, yi, env.cell_size, env.nx)
-        
-        # Check current and neighbor cells
-        for nc in env.neighbor_cells[c]
-            start = env.grid.cell_start[nc]
-            stop = start + env.grid.cell_count[nc][] - 1
-            
-            for k in start:stop
-                j = env.grid.agent_index[k]
-                if j <= i continue end
-                
-                dx = agents.x[j] - xi
-                dy = agents.y[j] - yi
-                
-                r2 = dx*dx + dy*dy
-                if r2 < sim.config.eco.interaction_radius2
-                    push!(segments, Point2f(agents.x[i], agents.y[i]))
-                    push!(segments, Point2f(agents.x[j], agents.y[j]))
-                end
-            end
-        end
-    end
-    return segments
-end
-
 # 6. Update function
-function update_visuals!(sim, points, traits, energies, interaction_segments)
+function update_visuals!(sim, points, color_trait, energies)
     points[] = Point2f.(sim.agents.x, sim.agents.y)
-    traits[] = sim.agents.trait
+    color_trait[] = sim.agents.traits[color_trait_name]
     energies[] = sim.agents.energy .* 10.0f0
-    interaction_segments[] = get_interaction_segments(sim)
 end
 
 # 7. Animation Loop
 try
     while isopen(fig.scene)
         # Multiple steps per frame for smoother/faster simulation
-        for _ in 1:2
+        for _ in 1:sim.config.steps_per_frame
             step!(sim)
         end
-        update_visuals!(sim, points, traits, energies, interaction_segments)
-        sleep(0.02)
+        update_visuals!(sim, points, color_trait, energies)
+        sleep(0.01)
     end
 catch e
     if !(e isa InterruptException)
         rethrow(e)
     end
 end
+
