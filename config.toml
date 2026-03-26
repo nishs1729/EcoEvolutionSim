@@ -1,7 +1,7 @@
 # EcoEvolutionSim Configuration
 
 # Simulation
-n_agents = 100_000
+n_agents = 100
 world_size = 50.0
 cell_size = 5.0
 steps_per_frame = 2

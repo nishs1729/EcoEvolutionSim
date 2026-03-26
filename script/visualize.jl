@@ -9,6 +9,7 @@ sim = init_simulation("config.toml")
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
 energies = Observable(sim.agents.energy .* 10.0f0) # Scale energy for markersize
+age = Observable(sim.agents.age) # Scale energy for markersize
 
 color_trait_name = "fecundity"
 color_trait = Observable(sim.agents.traits[color_trait_name])
@@ -26,7 +27,8 @@ scatter!(ax, points,
          colormap = :viridis, 
          colorrange = (TRAIT_SPECS[color_trait_name].mean - 3.0f0 * TRAIT_SPECS[color_trait_name].sigma, 
                        TRAIT_SPECS[color_trait_name].mean + 3.0f0 * TRAIT_SPECS[color_trait_name].sigma),
-         markersize = energies)
+         markersize = age)
+        #  markersize = energies)
 
 # Colorbar for traits
 Colorbar(fig[1, 2], label = "Trait Value", colormap = :viridis, limits = (0, 1))
@@ -35,9 +37,12 @@ display(fig)
 
 # 6. Update function
 function update_visuals!(sim, points, color_trait, energies)
-    points[] = Point2f.(sim.agents.x, sim.agents.y)
-    color_trait[] = sim.agents.traits[color_trait_name]
-    energies[] = sim.agents.energy .* 10.0f0
+    alive = sim.agents.alive
+
+    points[] = Point2f.(sim.agents.x[alive], sim.agents.y[alive])
+    color_trait[] = sim.agents.traits[color_trait_name][alive]
+    # energies[] = sim.agents.energy .* 10.0f0
+    age[] = sim.agents.age[alive]
 end
 
 # 7. Animation Loop
@@ -45,9 +50,10 @@ try
     while isopen(fig.scene)
         for _ in 1:sim.config.steps_per_frame
             step!(sim)
+            # print(sim.agents.age[1], " ", sim.agents.energy[1], "\n")
         end
         update_visuals!(sim, points, color_trait, energies)
-        sleep(0.01)
+        sleep(0.001)
     end
 catch e
     if !(e isa InterruptException)

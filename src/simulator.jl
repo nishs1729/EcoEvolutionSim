@@ -3,6 +3,9 @@ using Random
 using TOML
 using Configurations
 
+# include("agents.jl")
+
+
 ############################################################
 # Configuration and Models
 ############################################################
@@ -56,9 +59,8 @@ TRAIT_SPECS = Dict(
 )
 
 ############################################################
-# Agent storage (SoA)
+# Agent 
 ############################################################
-
 struct Agents
     x::Vector{Float32}
     y::Vector{Float32}
@@ -66,21 +68,57 @@ struct Agents
     vy::Vector{Float32}
     gender::Vector{UInt8} # 0: female, 1: male
     energy::Vector{Float32}
+    age::Vector{Float32}
+    alive::Vector{Bool}
     traits::Dict{String, Vector{Float32}}
 end
 
 function Agents(N, world_size, traits_dict::Dict{String, Vector{Float32}})
-    return Agents(
-        rand(Float32, N) .* world_size,  # x
-        rand(Float32, N) .* world_size,  # y
-        zeros(Float32, N),  # vx
-        zeros(Float32, N),  # vy
-        rand(UInt8(0):UInt8(1), N),  # gender
-        rand(Float32, N),  # energy
-        traits_dict  # traits
+    Agents(
+        rand(Float32, N) .* world_size,
+        rand(Float32, N) .* world_size,
+        zeros(Float32, N),
+        zeros(Float32, N),
+        rand(UInt8(0):UInt8(1), N),
+        rand(Float32, N),
+        rand(Float32, N) .* 10f0,   # initial age
+        trues(N),                   # alive
+        traits_dict
     )
 end
 
+function age_step!(sim)
+    agents = sim.agents
+    age = agents.age
+    alive = agents.alive
+
+    Threads.@threads for i in eachindex(age)
+        if alive[i]
+            age[i] += 0.01f0
+        end
+    end
+end
+
+function death_step!(sim)
+    agents = sim.agents
+    age = agents.age
+    alive = agents.alive
+
+    μ0 = 0.0001f0
+    k = 0.05f0
+
+    Threads.@threads for i in eachindex(age)
+        if !alive[i]
+            continue
+        end
+
+        a = age[i]
+        mortality = μ0 * exp(k*a)
+        if rand(Float32) < mortality
+            alive[i] = false
+        end
+    end
+end
 ############################################################
 # Spatial grid
 ############################################################
@@ -141,6 +179,7 @@ function build_cell_grid!(sim::Simulation)
     ncells = env.ncells
     cell_size = env.cell_size
     nx = env.nx
+    alive = agents.alive
 
     for c in 1:ncells
         env.grid.cell_count[c][] = 0
@@ -150,6 +189,9 @@ function build_cell_grid!(sim::Simulation)
     N = length(agents.x)
 
     Threads.@threads for i in 1:N
+        if !alive[i]
+            continue
+        end
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
         Threads.atomic_add!(env.grid.cell_count[c], 1)
     end
@@ -161,6 +203,9 @@ function build_cell_grid!(sim::Simulation)
     end
 
     Threads.@threads for i in 1:N
+        if !alive[i]
+            continue
+        end
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
         idx = Threads.atomic_add!(env.grid.cell_offset[c], 1)
         env.grid.agent_index[env.grid.cell_start[c] + idx] = i
@@ -210,7 +255,13 @@ function movement_random_walk!(sim::Simulation)
     vx = agents.vx
     vy = agents.vy
 
+    alive = agents.alive
+
     Threads.@threads for i in eachindex(x)
+        if !alive[i]
+            continue
+        end
+
         rng = Random.default_rng()
         @inbounds begin
             xi = x[i]
@@ -249,7 +300,13 @@ function movement_langevin!(sim::Simulation)
     vx = agents.vx
     vy = agents.vy
 
+    alive = agents.alive
+
     Threads.@threads for i in eachindex(x)
+        if !alive[i]
+            continue
+        end
+        
         rng = Random.default_rng()
         @inbounds begin
 
@@ -292,7 +349,13 @@ function movement_correlated_rw!(sim::Simulation)
     y = agents.y
     theta = agents.theta
 
+    alive = agents.alive
+
     Threads.@threads for i in eachindex(x)
+        if !alive[i]
+            continue
+        end
+        
         rng = Random.default_rng()
         @inbounds begin
 
@@ -337,7 +400,13 @@ function movement_active_brownian!(sim::Simulation)
     y = agents.y
     theta = agents.theta
 
+    alive = agents.alive
+
     Threads.@threads for i in eachindex(x)
+        if !alive[i]
+            continue
+        end
+        
         rng = Random.default_rng()
         @inbounds begin
 
@@ -373,6 +442,8 @@ end
 function step!(sim::Simulation)
     build_cell_grid!(sim)
     # compute_interactions!(sim, sim.fitness_fn)
+    age_step!(sim)
+    death_step!(sim)
     movement_step!(sim)
 end
 
