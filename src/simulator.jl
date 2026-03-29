@@ -9,22 +9,6 @@ include("traits.jl")
 include("space.jl")
 include("movement.jl")
 
-struct EnvironmentState
-    ncells::Int
-    nx::Int
-    ny::Int
-    cell_size::Float32
-    grid::CellGrid
-    neighbors::Vector{Vector{Int}}
-end
-
-struct Simulation{F}
-    config::Config
-    agents::Agents
-    env::EnvironmentState
-    movement_kernel!::F
-end
-
 # One simulation step
 function step!(sim::Simulation)
     build_cell_grid!(sim)

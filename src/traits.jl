@@ -1,8 +1,4 @@
-struct TraitSpec
-    mean::Float32
-    sigma::Float32
-end
-
+## User defined trait specifications
 const TRAIT_SPECS = Dict(
     "dispersal" => TraitSpec(1.0f0, 0.2f0),
     "fecundity" => TraitSpec(5.0f0, 1.0f0)

@@ -1,15 +1,8 @@
-struct CellGrid
-    cell_start::Vector{Int}
-    cell_count::Vector{Threads.Atomic{Int}}
-    cell_offset::Vector{Threads.Atomic{Int}}
-    agent_index::Vector{Int32}
-end
-
 function CellGrid(ncells, N)
     return CellGrid(
         zeros(Int, ncells),
-        [Threads.Atomic{Int}(0) for _ in 1:ncells],
-        [Threads.Atomic{Int}(0) for _ in 1:ncells],
+        zeros(Int, ncells),
+        zeros(Int, ncells),
         Vector{Int32}(undef, N)
     )
 end
@@ -31,33 +24,33 @@ function build_cell_grid!(sim::Simulation)
     nx = env.nx
     alive = agents.alive
 
-    for c in 1:ncells
-        env.grid.cell_count[c][] = 0
-        env.grid.cell_offset[c][] = 0
-    end
+    fill!(env.grid.cell_count, 0)
+    fill!(env.grid.cell_offset, 0)
 
     N = length(agents.x)
 
-    Threads.@threads for i in 1:N
+    # For small N, serial is much faster than parallel with atomic contention
+    for i in 1:N
         if !alive[i]
             continue
         end
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
-        Threads.atomic_add!(env.grid.cell_count[c], 1)
+        env.grid.cell_count[c] += 1
     end
 
     s = 1
     for c in 1:ncells
         env.grid.cell_start[c] = s
-        s += env.grid.cell_count[c][]
+        s += env.grid.cell_count[c]
     end
 
-    Threads.@threads for i in 1:N
+    for i in 1:N
         if !alive[i]
             continue
         end
         c = cell_index(agents.x[i], agents.y[i], cell_size, nx, env.ny)
-        idx = Threads.atomic_add!(env.grid.cell_offset[c], 1)
+        idx = env.grid.cell_offset[c]
+        env.grid.cell_offset[c] += 1
         env.grid.agent_index[env.grid.cell_start[c] + idx] = i
     end
 end
