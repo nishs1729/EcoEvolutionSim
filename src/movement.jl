@@ -39,12 +39,9 @@ function movement_random_walk!(sim::Simulation)
     alive = agents.alive
 
     if length(x) > MIN_PARALLEL_N
+        rng = Random.default_rng()
         Threads.@threads for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            rng = Random.default_rng()
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 vxi, vyi = vx[i], vy[i]
 
@@ -61,10 +58,7 @@ function movement_random_walk!(sim::Simulation)
     else
         rng = Random.default_rng()
         for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 vxi, vyi = vx[i], vy[i]
 
@@ -96,12 +90,9 @@ function movement_langevin!(sim::Simulation)
     alive = agents.alive
 
     if length(x) > MIN_PARALLEL_N
+        rng = Random.default_rng()
         Threads.@threads for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            rng = Random.default_rng()
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 vxi, vyi = vx[i], vy[i]
 
@@ -121,10 +112,7 @@ function movement_langevin!(sim::Simulation)
     else
         rng = Random.default_rng()
         for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 vxi, vyi = vx[i], vy[i]
 
@@ -160,12 +148,9 @@ function movement_correlated_rw!(sim::Simulation)
     alive = agents.alive
 
     if length(x) > MIN_PARALLEL_N
+        rng = Random.default_rng()
         Threads.@threads for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            rng = Random.default_rng()
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 θ = theta[i]
 
@@ -188,10 +173,7 @@ function movement_correlated_rw!(sim::Simulation)
     else
         rng = Random.default_rng()
         for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 θ = theta[i]
 
@@ -229,12 +211,9 @@ function movement_active_brownian!(sim::Simulation)
     alive = agents.alive
 
     if length(x) > MIN_PARALLEL_N
+        rng = Random.default_rng()
         Threads.@threads for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            rng = Random.default_rng()
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 θ = theta[i]
 
@@ -257,10 +236,7 @@ function movement_active_brownian!(sim::Simulation)
     else
         rng = Random.default_rng()
         for i in eachindex(x)
-            if !alive[i]
-                continue
-            end
-            @inbounds begin
+            @inbounds if alive[i]
                 xi, yi = x[i], y[i]
                 θ = theta[i]
 

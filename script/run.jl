@@ -8,7 +8,7 @@ using Random
 
 config_file = "config.toml"
 
-nsteps = 2000
+nsteps = 5000
 save_every = 1000
 outfile = "data/simulation_output.h5"
 

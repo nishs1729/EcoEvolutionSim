@@ -30,7 +30,7 @@ function build_cell_grid!(sim::Simulation)
     N = length(agents.x)
 
     # For small N, serial is much faster than parallel with atomic contention
-    for i in 1:N
+    @inbounds for i in 1:N
         if !alive[i]
             continue
         end
@@ -39,12 +39,12 @@ function build_cell_grid!(sim::Simulation)
     end
 
     s = 1
-    for c in 1:ncells
+    @inbounds for c in 1:ncells
         env.grid.cell_start[c] = s
         s += env.grid.cell_count[c]
     end
 
-    for i in 1:N
+    @inbounds for i in 1:N
         if !alive[i]
             continue
         end

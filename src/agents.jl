@@ -19,15 +19,11 @@ function age_step!(sim::Simulation)
 
     if length(age) > MIN_PARALLEL_N
         Threads.@threads for i in eachindex(age)
-            if alive[i]
-                age[i] += 0.01f0
-            end
+            @inbounds age[i] += alive[i] * 0.01f0
         end
     else
-        for i in eachindex(age)
-            if alive[i]
-                age[i] += 0.01f0
-            end
+        @inbounds @simd for i in eachindex(age)
+            age[i] += alive[i] * 0.01f0
         end
     end
 end
@@ -41,28 +37,25 @@ function death_step!(sim::Simulation)
     k = 0.000f0
 
     if length(age) > MIN_PARALLEL_N
+        rng = Random.default_rng()
         Threads.@threads for i in eachindex(age)
-            if !alive[i]
-                continue
-            end
-
-            a = age[i]
-            @fastmath mortality = μ0 * exp(k*a)
-            if rand(Float32) < mortality
-                alive[i] = false
+            @inbounds if alive[i]
+                a = age[i]
+                @fastmath mortality = μ0 * exp(k*a)
+                if rand(rng, Float32) < mortality
+                    alive[i] = false
+                end
             end
         end
     else
         rng = Random.default_rng()
         for i in eachindex(age)
-            if !alive[i]
-                continue
-            end
-
-            a = age[i]
-            @fastmath mortality = μ0 * exp(k*a)
-            if rand(rng, Float32) < mortality
-                alive[i] = false
+            @inbounds if alive[i]
+                a = age[i]
+                @fastmath mortality = μ0 * exp(k*a)
+                if rand(rng, Float32) < mortality
+                    alive[i] = false
+                end
             end
         end
     end
