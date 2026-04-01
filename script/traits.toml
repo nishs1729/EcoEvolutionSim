@@ -1,0 +1,7 @@
+[dispersal]
+mean = 1.0
+sigma = 0.2
+
+[fecundity]
+mean = 5.0
+sigma = 1.0

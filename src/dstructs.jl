@@ -3,32 +3,6 @@ struct TraitSpec
     sigma::Float32
 end
 
-## User defined trait specifications
-const TRAIT_SPECS = Dict(
-    "dispersal" => TraitSpec(1.0f0, 0.2f0),
-    "fecundity" => TraitSpec(5.0f0, 1.0f0)
-)
-
-macro define_traits(specs)
-    names = collect(keys(eval(specs)))
-
-    fields = [:($(Symbol(n))::Vector{Float32}) for n in names]
-
-    quote
-        Base.@kwdef struct Traits
-            $(fields...)
-        end
-    end
-end
-
-@define_traits TRAIT_SPECS
-
-# Convenience methods for Traits to support iteration and indexing
-Base.iterate(t::Traits, state=1) = state > length(fieldnames(Traits)) ? nothing : (string(fieldnames(Traits)[state]) => getfield(t, fieldnames(Traits)[state]), state + 1)
-Base.length(t::Traits) = length(fieldnames(Traits))
-Base.getindex(t::Traits, key::Symbol) = getfield(t, key)
-Base.getindex(t::Traits, key::String) = getfield(t, Symbol(key))
-
 @enum MovementStrategy begin
     RANDOM_WALK = 1
     LANGEVIN = 2
@@ -51,7 +25,7 @@ end
     r_interact::Float32 = 1.0f0
 end
 
-struct Agents
+struct Agents{T}
     x::Vector{Float32}
     y::Vector{Float32}
     vx::Vector{Float32}
@@ -60,7 +34,7 @@ struct Agents
     energy::Vector{Float32}
     age::Vector{Float32}
     alive::Vector{Bool}
-    traits::Traits
+    traits::T
 end
 
 struct CellGrid
@@ -79,9 +53,9 @@ struct EnvironmentState
     neighbors::Vector{Vector{Int}}
 end
 
-struct Simulation{F}
+struct Simulation{F, T}
     config::Config
-    agents::Agents
+    agents::Agents{T}
     env::EnvironmentState
     movement_kernel!::F
 end

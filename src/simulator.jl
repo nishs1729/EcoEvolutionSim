@@ -10,13 +10,14 @@ include("space.jl")
 include("movement.jl")
 
 # Initialize simulation
-function init_simulation(config_path::String = "config.toml")
+function init_simulation(config_path::String = "config.toml", traits_path::String = "script/traits.toml")
     config = load_config(config_path)
     nx = Int(config.world_size / config.cell_size)
     ny = nx
     ncells = nx * ny
     
-    traits = initialize_traits(TRAIT_SPECS, config.n_agents)
+    trait_specs = load_traits(traits_path)
+    traits = initialize_traits(trait_specs, config.n_agents)
     agents = Agents(config.n_agents, config.world_size, traits)
     neighbor_table = build_neighbor_table(nx, ny)
     grid = CellGrid(ncells, config.n_agents)

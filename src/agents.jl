@@ -1,4 +1,4 @@
-function Agents(N, world_size, traits::Traits)
+function Agents(N, world_size, traits)
     Agents(
         rand(Float32, N) .* world_size,
         rand(Float32, N) .* world_size,
@@ -7,7 +7,7 @@ function Agents(N, world_size, traits::Traits)
         rand(UInt8(0):UInt8(1), N),
         rand(Float32, N),
         rand(Float32, N) .* 10f0,   # initial age
-        trues(N),                   # alive
+        fill(true, N),                   # alive
         traits
     )
 end

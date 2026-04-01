@@ -8,14 +8,13 @@ using Random
 
 config_file = "config.toml"
 
-nsteps = 5000
+nsteps = 2000
 save_every = 1000
 outfile = "data/simulation_output.h5"
 
 # --------------------------------
 # Initialize simulation
 # --------------------------------
-
 sim = init_simulation(config_file)
 
 max_agents = length(sim.agents.x)
@@ -62,17 +61,16 @@ h5open(outfile, "w") do file
 
     trait_dsets = Dict{String,HDF5.Dataset}()
 
-    for (name, _) in sim.agents.traits
-
-        trait_dsets[name] = create_dataset(
+    for (name, _) in pairs(sim.agents.traits)
+        sname = string(name)
+        trait_dsets[sname] = create_dataset(
             file,
-            "trait_" * name,
+            "trait_" * sname,
             Float32,
             (max_agents, nsaves),
             chunk=(max_agents, 1),
             compress=3
         )
-
     end
 
     # --------------------------------
@@ -103,8 +101,8 @@ h5open(outfile, "w") do file
             energy_dset[1:pop, snapshot] = sim.agents.energy[alive]
             age_dset[1:pop, snapshot] = sim.agents.age[alive]
 
-            for (name, values) in sim.agents.traits
-                trait_dsets[name][1:pop, snapshot] = values[alive]
+            for (name, values) in pairs(sim.agents.traits)
+                trait_dsets[string(name)][1:pop, snapshot] = values[alive]
             end
 
             pop_dset[snapshot] = pop

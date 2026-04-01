@@ -4,7 +4,9 @@ using Random
 using GLMakie
 
 # 1. Initialize Simulation
-sim = init_simulation("config.toml")
+traits_path = "script/traits.toml"
+sim = init_simulation("config.toml", traits_path)
+trait_specs = load_traits(traits_path)
 
 # 2. Setup Observables
 points = Observable(Point2f.(sim.agents.x, sim.agents.y))
@@ -12,7 +14,7 @@ energies = Observable(sim.agents.energy .* 10.0f0) # Scale energy for markersize
 age = Observable(sim.agents.age) # Scale energy for markersize
 
 color_trait_name = "fecundity"
-color_trait = Observable(sim.agents.traits[color_trait_name])
+color_trait = Observable(sim.agents.traits[Symbol(color_trait_name)])
 
 # 3. Setup Figure
 fig = Figure(size = (800, 800))
@@ -22,11 +24,12 @@ ax = Axis(fig[1, 1], title = "Eco-Evolutionary Simulation (Reflective Boundaries
 
 # 4. Plotting
 # Agents
+spec = trait_specs[color_trait_name]
 scatter!(ax, points,
          color = color_trait, 
          colormap = :viridis, 
-         colorrange = (TRAIT_SPECS[color_trait_name].mean - 3.0f0 * TRAIT_SPECS[color_trait_name].sigma, 
-                       TRAIT_SPECS[color_trait_name].mean + 3.0f0 * TRAIT_SPECS[color_trait_name].sigma),
+         colorrange = (spec.mean - 3.0f0 * spec.sigma, 
+                       spec.mean + 3.0f0 * spec.sigma),
          markersize = age)
         #  markersize = energies)
 
@@ -40,7 +43,7 @@ function update_visuals!(sim, points, color_trait, energies)
     alive = sim.agents.alive
 
     points[] = Point2f.(sim.agents.x[alive], sim.agents.y[alive])
-    color_trait[] = sim.agents.traits[color_trait_name][alive]
+    color_trait[] = sim.agents.traits[Symbol(color_trait_name)][alive]
     # energies[] = sim.agents.energy .* 10.0f0
     age[] = sim.agents.age[alive]
 end
@@ -60,4 +63,3 @@ catch e
         rethrow(e)
     end
 end
-
