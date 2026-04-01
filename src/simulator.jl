@@ -16,8 +16,8 @@ function init_simulation(config_path::String = "config.toml")
     ny = nx
     ncells = nx * ny
     
-    traits_dict = initialize_traits(TRAIT_SPECS, config.n_agents)
-    agents = Agents(config.n_agents, config.world_size, traits_dict)
+    traits = initialize_traits(TRAIT_SPECS, config.n_agents)
+    agents = Agents(config.n_agents, config.world_size, traits)
     neighbor_table = build_neighbor_table(nx, ny)
     grid = CellGrid(ncells, config.n_agents)
     env = EnvironmentState(ncells, nx, ny, config.cell_size, grid, neighbor_table)

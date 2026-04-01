@@ -1,4 +1,4 @@
-function Agents(N, world_size, traits_dict::Dict{String, Vector{Float32}})
+function Agents(N, world_size, traits::Traits)
     Agents(
         rand(Float32, N) .* world_size,
         rand(Float32, N) .* world_size,
@@ -8,7 +8,7 @@ function Agents(N, world_size, traits_dict::Dict{String, Vector{Float32}})
         rand(Float32, N),
         rand(Float32, N) .* 10f0,   # initial age
         trues(N),                   # alive
-        traits_dict
+        traits
     )
 end
 
