@@ -113,6 +113,10 @@ h5open(outfile, "w") do file
 
     end
 
-end
+    end
 
-println("Simulation complete.")
+    println("\n=== Performance Report ===")
+    show(to)
+    println()
+
+    println("\nSimulation complete.")

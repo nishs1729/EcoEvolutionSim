@@ -26,234 +26,198 @@ end
 end
 
 function movement_random_walk!(sim::Simulation)
-    agents = sim.agents
-    config = sim.config
-    world = config.world_size
-    speed = config.base_speed
-    half = 0.5f0 * speed
+    @timeit to "kernel_rw" begin
+        agents = sim.agents
+        config = sim.config
+        world = config.world_size
+        speed = config.base_speed
 
-    x = agents.x
-    y = agents.y
-    vx = agents.vx
-    vy = agents.vy
-    alive = agents.alive
+        # Pre-calculated constant
+        half = 0.5f0 * speed
 
-    if length(x) > MIN_PARALLEL_N
-        rng = Random.default_rng()
-        Threads.@threads for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                vxi, vyi = vx[i], vy[i]
+        x, y = agents.x, agents.y
+        vx, vy = agents.vx, agents.vy
+        alive = agents.alive
 
-                xi += rand(rng, Float32)*speed - half
-                yi += rand(rng, Float32)*speed - half
+        if length(x) > MIN_PARALLEL_N
+            Threads.@threads for i in eachindex(x)
+                @inbounds if alive[i]
+                    xi, yi = x[i] + rand(Float32)*speed - half, y[i] + rand(Float32)*speed - half
 
-                xi, vxi = reflect!(xi, vxi, world)
-                yi, vyi = reflect!(yi, vyi, world)
+                    xi, vxi = reflect!(xi, vx[i], world)
+                    yi, vyi = reflect!(yi, vy[i], world)
 
-                x[i], y[i] = xi, yi
-                vx[i], vy[i] = vxi, vyi
+                    x[i], y[i] = xi, yi
+                    vx[i], vy[i] = vxi, vyi
+                end
             end
-        end
-    else
-        rng = Random.default_rng()
-        for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                vxi, vyi = vx[i], vy[i]
+        else
+            for i in eachindex(x)
+                @inbounds if alive[i]
+                    xi, yi = x[i] + rand(Float32)*speed - half, y[i] + rand(Float32)*speed - half
 
-                xi += rand(rng, Float32)*speed - half
-                yi += rand(rng, Float32)*speed - half
+                    xi, vxi = reflect!(xi, vx[i], world)
+                    yi, vyi = reflect!(yi, vy[i], world)
 
-                xi, vxi = reflect!(xi, vxi, world)
-                yi, vyi = reflect!(yi, vyi, world)
-
-                x[i], y[i] = xi, yi
-                vx[i], vy[i] = vxi, vyi
+                    x[i], y[i] = xi, yi
+                    vx[i], vy[i] = vxi, vyi
+                end
             end
         end
     end
 end
 
 function movement_langevin!(sim::Simulation)
-    agents = sim.agents
-    config = sim.config
-    world = config.world_size
-    noise = config.noise_strength
-    friction = config.friction
+    @timeit to "kernel_langevin" begin
+        agents = sim.agents
+        config = sim.config
+        world = config.world_size
+        noise = config.noise_strength
+        friction = config.friction
 
-    damp = 1f0 - friction
-    halfnoise = 0.5f0 * noise
+        damp = 1f0 - friction
+        halfnoise = 0.5f0 * noise
 
-    x, y = agents.x, agents.y
-    vx, vy = agents.vx, agents.vy
-    alive = agents.alive
+        x, y = agents.x, agents.y
+        vx, vy = agents.vx, agents.vy
+        alive = agents.alive
 
-    if length(x) > MIN_PARALLEL_N
-        rng = Random.default_rng()
-        Threads.@threads for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                vxi, vyi = vx[i], vy[i]
+        if length(x) > MIN_PARALLEL_N
+            Threads.@threads for i in eachindex(x)
+                @inbounds if alive[i]
+                    vxi = vx[i]*damp + noise*rand(Float32) - halfnoise
+                    vyi = vy[i]*damp + noise*rand(Float32) - halfnoise
 
-                vxi = vxi*damp + noise*rand(rng, Float32) - halfnoise
-                vyi = vyi*damp + noise*rand(rng, Float32) - halfnoise
+                    xi, vxi = reflect!(x[i] + vxi, vxi, world)
+                    yi, vyi = reflect!(y[i] + vyi, vyi, world)
 
-                xi += vxi
-                yi += vyi
-
-                xi, vxi = reflect!(xi, vxi, world)
-                yi, vyi = reflect!(yi, vyi, world)
-
-                x[i], y[i] = xi, yi
-                vx[i], vy[i] = vxi, vyi
+                    x[i], y[i] = xi, yi
+                    vx[i], vy[i] = vxi, vyi
+                end
             end
-        end
-    else
-        rng = Random.default_rng()
-        for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                vxi, vyi = vx[i], vy[i]
+        else
+            for i in eachindex(x)
+                @inbounds if alive[i]
+                    vxi = vx[i]*damp + noise*rand(Float32) - halfnoise
+                    vyi = vy[i]*damp + noise*rand(Float32) - halfnoise
 
-                vxi = vxi*damp + noise*rand(rng, Float32) - halfnoise
-                vyi = vyi*damp + noise*rand(rng, Float32) - halfnoise
+                    xi, vxi = reflect!(x[i] + vxi, vxi, world)
+                    yi, vyi = reflect!(y[i] + vyi, vyi, world)
 
-                xi += vxi
-                yi += vyi
-
-                xi, vxi = reflect!(xi, vxi, world)
-                yi, vyi = reflect!(yi, vyi, world)
-
-                x[i], y[i] = xi, yi
-                vx[i], vy[i] = vxi, vyi
+                    x[i], y[i] = xi, yi
+                    vx[i], vy[i] = vxi, vyi
+                end
             end
         end
     end
 end
 
 function movement_correlated_rw!(sim::Simulation)
-    agents = sim.agents
-    config = sim.config
-    world = config.world_size
-    noise = config.noise_strength
-    speed = config.base_speed
+    @timeit to "kernel_crw" begin
+        agents = sim.agents
+        config = sim.config
+        world = config.world_size
+        noise = config.noise_strength
+        speed = config.base_speed
 
-    halfnoise = 0.5f0 * noise
-    π32 = Float32(π)
-    twopi = 2f0 * π32
+        halfnoise = 0.5f0 * noise
+        π32 = Float32(π)
+        twopi = 2f0 * π32
 
-    x, y = agents.x, agents.y
-    theta = agents.theta
-    alive = agents.alive
+        x, y = agents.x, agents.y
+        theta = agents.theta
+        alive = agents.alive
 
-    if length(x) > MIN_PARALLEL_N
-        rng = Random.default_rng()
-        Threads.@threads for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                θ = theta[i]
+        if length(x) > MIN_PARALLEL_N
+            Threads.@threads for i in eachindex(x)
+                @inbounds if alive[i]
+                    θ = theta[i] + noise*rand(Float32) - halfnoise
+                    s, c = sincos(θ)
+                    xi, yi = x[i] + speed*c, y[i] + speed*s
 
-                θ += noise*rand(rng, Float32) - halfnoise
-                s, c = sincos(θ)
-                xi += speed*c
-                yi += speed*s
+                    if xi < 0f0 || xi > world
+                        θ = π32 - θ
+                    end
+                    if yi < 0f0 || yi > world
+                        θ = -θ
+                    end
 
-                if xi < 0f0 || xi > world
-                    θ = π32 - θ
+                    theta[i] = mod(θ, twopi)
+                    x[i], y[i] = xi, yi
                 end
-                if yi < 0f0 || yi > world
-                    θ = -θ
-                end
-
-                theta[i] = mod(θ, twopi)
-                x[i], y[i] = xi, yi
             end
-        end
-    else
-        rng = Random.default_rng()
-        for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                θ = theta[i]
+        else
+            for i in eachindex(x)
+                @inbounds if alive[i]
+                    θ = theta[i] + noise*rand(Float32) - halfnoise
+                    s, c = sincos(θ)
+                    xi, yi = x[i] + speed*c, y[i] + speed*s
 
-                θ += noise*rand(rng, Float32) - halfnoise
-                s, c = sincos(θ)
-                xi += speed*c
-                yi += speed*s
+                    if xi < 0f0 || xi > world
+                        θ = π32 - θ
+                    end
+                    if yi < 0f0 || yi > world
+                        θ = -θ
+                    end
 
-                if xi < 0f0 || xi > world
-                    θ = π32 - θ
+                    theta[i] = mod(θ, twopi)
+                    x[i], y[i] = xi, yi
                 end
-                if yi < 0f0 || yi > world
-                    θ = -θ
-                end
-
-                theta[i] = mod(θ, twopi)
-                x[i], y[i] = xi, yi
             end
         end
     end
 end
 
 function movement_active_brownian!(sim::Simulation)
-    agents = sim.agents
-    config = sim.config
-    world = config.world_size
-    noise = config.noise_strength
-    speed = config.base_speed
+    @timeit to "kernel_abm" begin
+        agents = sim.agents
+        config = sim.config
+        world = config.world_size
+        noise = config.noise_strength
+        speed = config.base_speed
 
-    π32 = Float32(π)
-    twopi = 2f0 * π32
+        π32 = Float32(π)
+        twopi = 2f0 * π32
 
-    x, y = agents.x, agents.y
-    theta = agents.theta
-    alive = agents.alive
+        x, y = agents.x, agents.y
+        theta = agents.theta
+        alive = agents.alive
 
-    if length(x) > MIN_PARALLEL_N
-        rng = Random.default_rng()
-        Threads.@threads for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                θ = theta[i]
+        if length(x) > MIN_PARALLEL_N
+            Threads.@threads for i in eachindex(x)
+                @inbounds if alive[i]
+                    θ = theta[i] + noise * randn(Float32)
+                    s, c = sincos(θ)
+                    xi, yi = x[i] + speed*c, y[i] + speed*s
 
-                θ += noise * randn(rng, Float32)
-                s, c = sincos(θ)
-                xi += speed*c
-                yi += speed*s
+                    if xi < 0f0 || xi > world
+                        θ = π32 - θ
+                    end
+                    if yi < 0f0 || yi > world
+                        θ = -θ
+                    end
 
-                if xi < 0f0 || xi > world
-                    θ = π32 - θ
+                    theta[i] = mod(θ, twopi)
+                    x[i], y[i] = xi, yi
                 end
-                if yi < 0f0 || yi > world
-                    θ = -θ
-                end
-
-                theta[i] = mod(θ, twopi)
-                x[i], y[i] = xi, yi
             end
-        end
-    else
-        rng = Random.default_rng()
-        for i in eachindex(x)
-            @inbounds if alive[i]
-                xi, yi = x[i], y[i]
-                θ = theta[i]
+        else
+            for i in eachindex(x)
+                @inbounds if alive[i]
+                    θ = theta[i] + noise * randn(Float32)
+                    s, c = sincos(θ)
+                    xi, yi = x[i] + speed*c, y[i] + speed*s
 
-                θ += noise * randn(rng, Float32)
-                s, c = sincos(θ)
-                xi += speed*c
-                yi += speed*s
+                    if xi < 0f0 || xi > world
+                        θ = π32 - θ
+                    end
+                    if yi < 0f0 || yi > world
+                        θ = -θ
+                    end
 
-                if xi < 0f0 || xi > world
-                    θ = π32 - θ
+                    theta[i] = mod(θ, twopi)
+                    x[i], y[i] = xi, yi
                 end
-                if yi < 0f0 || yi > world
-                    θ = -θ
-                end
-
-                theta[i] = mod(θ, twopi)
-                x[i], y[i] = xi, yi
             end
         end
     end
