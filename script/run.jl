@@ -7,8 +7,10 @@ nsteps = 2000
 save_every = 100
 outfile = "data/simulation_output.h5"
 
+include("interactions.jl")
+
 # Initialize simulation
-sim = init_simulation(config_file)
+sim = init_simulation(config_file; interactions = (interaction_reproduction!,))
 max_agents = length(sim.agents.x)
 nsaves = nsteps ÷ save_every
 

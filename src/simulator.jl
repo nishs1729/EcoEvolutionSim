@@ -1,5 +1,5 @@
 # Initialize simulation
-function init_simulation(config_path::String = "config.toml", traits_path::String = "script/traits.toml")
+function init_simulation(config_path::String = "config.toml", traits_path::String = "script/traits.toml"; interactions::Tuple = ())
     @timeit to "initialization" begin
         config = load_config(config_path)
         nx = ceil(Int, config.world_width / config.cell_size)
@@ -15,7 +15,7 @@ function init_simulation(config_path::String = "config.toml", traits_path::Strin
         env = EnvironmentState(ncells, nx, ny, config.cell_size, inv_cell_size, grid, neighbor_table)
         movement_kernel = select_movement_kernel(config.strategy)
 
-        return Simulation(config, agents, env, movement_kernel)
+        return Simulation(config, agents, env, movement_kernel, interactions)
     end
 end
 
@@ -23,6 +23,7 @@ end
 function step!(sim::Simulation)
     @timeit to "step" begin
         @timeit to "build_grid" build_cell_grid!(sim)
+        interactions_step!(sim)
         ecology_step!(sim)
         @timeit to "movement" movement_step!(sim)
     end

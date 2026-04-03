@@ -128,3 +128,62 @@ function build_neighbor_table(nx, ny)
     end
     return NeighborTable(neighbors, count)
 end
+
+# Spatial Iterator
+export nearby_agents
+
+struct NearbyAgentIterator{S}
+    sim::S
+    agent_id::Int
+    r_sq::Float32
+end
+
+function nearby_agents(sim::Simulation, agent_id::Int, r::Float32)
+    NearbyAgentIterator{typeof(sim)}(sim, agent_id, r * r)
+end
+
+Base.IteratorSize(::Type{<:NearbyAgentIterator}) = Base.SizeUnknown()
+Base.IteratorEltype(::Type{<:NearbyAgentIterator}) = Base.HasEltype()
+Base.eltype(::Type{<:NearbyAgentIterator}) = Int
+
+function Base.iterate(iter::NearbyAgentIterator)
+    sim = iter.sim
+    i = iter.agent_id
+    env = sim.env
+    x, y = sim.agents.x[i], sim.agents.y[i]
+    c = cell_index(x, y, env.inv_cell_size, env.nx, env.ny)
+    return iterate_next(iter, 1, 1, c)
+end
+
+function Base.iterate(iter::NearbyAgentIterator, state::Tuple{Int, Int, Int})
+    return iterate_next(iter, state[1], state[2], state[3])
+end
+
+@inline function iterate_next(iter::NearbyAgentIterator, n_idx::Int, j_idx::Int, origin_c::Int)
+    sim = iter.sim
+    i = iter.agent_id
+    env = sim.env
+    r_sq = iter.r_sq
+    x0, y0 = sim.agents.x[i], sim.agents.y[i]
+    
+    @inbounds while n_idx <= env.neighbors.count[origin_c]
+        c = env.neighbors.neighbors[n_idx, origin_c]
+        count = env.grid.cell_count[c]
+        start = env.grid.cell_start[c]
+        
+        while j_idx <= count
+            j = env.grid.agent_index[start + j_idx - 1]
+            j_idx += 1
+            if j != i && sim.agents.alive[j]
+                dx = sim.agents.x[j] - x0
+                dy = sim.agents.y[j] - y0
+                if dx*dx + dy*dy <= r_sq
+                    return (j, (n_idx, j_idx, origin_c))
+                end
+            end
+        end
+        n_idx += 1
+        j_idx = 1
+    end
+    return nothing
+end

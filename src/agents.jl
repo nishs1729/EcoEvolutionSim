@@ -13,6 +13,7 @@ function Agents(max_agents, initial_agents, world_width, world_length, traits)
         rand(UInt8(0):UInt8(1), max_agents),
         rand(Float32, max_agents),
         rand(Float32, max_agents) .* 10f0,   # initial age
+        zeros(Float32, max_agents),          # last_mating
         alive,
         traits,
         initial_agents,
@@ -31,14 +32,14 @@ function ecology_step!(sim::Simulation)
         metabolic_drain = sim.config.metabolic_rate * dt
 
         μ0 = 0.0001f0
-        k = 0.0001f0
+        k = 0.01f0
 
         Threads.@threads :static for i in 1:agents.max_id
             @inbounds if alive[i]
                 # Age step
                 a = age[i] + dt
                 age[i] = a
-                
+
                 # Metabolism step
                 energy[i] -= metabolic_drain
 
@@ -56,6 +57,41 @@ function ecology_step!(sim::Simulation)
             if !isempty(agents.death_buffer[t])
                 append!(agents.free_indices, agents.death_buffer[t])
                 empty!(agents.death_buffer[t])
+            end
+        end
+    end
+end
+
+const SPAWN_LOCK = Threads.SpinLock()
+
+function claim_agent_id!(sim::Simulation)
+    lock(SPAWN_LOCK)
+    try
+        if !isempty(sim.agents.free_indices)
+            return pop!(sim.agents.free_indices)
+        else
+            id = sim.agents.max_id + 1
+            if id <= length(sim.agents.alive)
+                sim.agents.max_id = id
+                return id
+            else
+                return 0 # Out of bounds
+            end
+        end
+    finally
+        unlock(SPAWN_LOCK)
+    end
+end
+
+function interactions_step!(sim::Simulation)
+    @timeit to "kernel_interactions" begin
+        if !isempty(sim.interactions)
+            Threads.@threads :static for i in 1:sim.agents.max_id
+                @inbounds if sim.agents.alive[i]
+                    for interact! in sim.interactions
+                        interact!(sim, i)
+                    end
+                end
             end
         end
     end

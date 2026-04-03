@@ -40,7 +40,7 @@
         
         config = Config(world_width=10.0f0, world_length=10.0f0, strategy=RANDOM_WALK, base_speed=12.0f0) 
         kernel = EcoEvolutionSim.select_movement_kernel(RANDOM_WALK)
-        sim = Simulation(config, agents, env, kernel)
+        sim = Simulation(config, agents, env, kernel, ())
         
         movement_step!(sim)
         

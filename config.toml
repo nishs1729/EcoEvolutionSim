@@ -16,5 +16,5 @@ noise_strength = 0.1 # units vary by strategy (km/day^(3/2) or radians/sqrt(day)
 friction = 0.1 # 1/day
 
 # ecology / interaction
-r_interact = 1.0 # km
+r_interact = 0.01 # km
 metabolic_rate = 10.0 # Joules/day

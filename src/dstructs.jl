@@ -39,6 +39,7 @@ mutable struct Agents{T}
     gender::Vector{UInt8} # 0: female, 1: male
     energy::Vector{Float32}
     age::Vector{Float32}
+    last_mating::Vector{Float32}
     alive::Vector{Bool}
     traits::T
     max_id::Int
@@ -68,9 +69,10 @@ struct EnvironmentState
     neighbors::NeighborTable
 end
 
-struct Simulation{F, T}
+struct Simulation{F, T, I}
     config::Config
     agents::Agents{T}
     env::EnvironmentState
     movement_kernel!::F
+    interactions::I
 end

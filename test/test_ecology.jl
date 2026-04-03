@@ -10,7 +10,7 @@
         config = Config()
         neighbor_table = NeighborTable(Matrix{Int32}(undef, 0, 0), Int8[])
         env = EnvironmentState(1, 1, 1, 10.0f0, 0.1f0, CellGrid(1, N), neighbor_table)
-        sim = Simulation(config, agents, env, x -> nothing)
+        sim = Simulation(config, agents, env, x -> nothing, ())
         
         ecology_step!(sim)
         
