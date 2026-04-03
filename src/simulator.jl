@@ -2,13 +2,13 @@
 function init_simulation(config_path::String = "config.toml", traits_path::String = "script/traits.toml")
     @timeit to "initialization" begin
         config = load_config(config_path)
-        nx = Int(config.world_size / config.cell_size)
-        ny = nx
+        nx = ceil(Int, config.world_width / config.cell_size)
+        ny = ceil(Int, config.world_length / config.cell_size)
         ncells = nx * ny
 
         trait_specs = load_traits(traits_path)
         traits = initialize_traits(trait_specs, config.max_agents, config.n_agents)
-        agents = Agents(config.max_agents, config.n_agents, config.world_size, traits)
+        agents = Agents(config.max_agents, config.n_agents, config.world_width, config.world_length, traits)
         neighbor_table = build_neighbor_table(nx, ny)
         grid = CellGrid(ncells, config.max_agents)
         inv_cell_size = 1.0f0 / config.cell_size

@@ -17,7 +17,8 @@ println("Snapshots to store: ", nsaves)
 
 # Create HDF5 file
 h5open(outfile, "w") do file
-    file["world_size"] = sim.config.world_size
+    file["world_width"] = sim.config.world_width
+    file["world_length"] = sim.config.world_length
     file["save_every"] = save_every
 
     # Preallocated datasets

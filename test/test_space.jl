@@ -35,7 +35,7 @@
     @testset "Grid Building" begin
         N = 5
         traits = (test = zeros(Float32, N),)
-        agents = Agents(N, 10.0f0, traits)
+        agents = Agents(N, N, 10.0f0, 10.0f0, traits)
         
         # Fix coordinates for predictable cells
         # world 10.0, cell_size 5.0 -> nx=2, ny=2, ncells=4
@@ -51,7 +51,7 @@
         grid = CellGrid(4, N)
         neighbor_table = NeighborTable(Matrix{Int32}(undef, 0, 0), Int8[])
         env = EnvironmentState(4, 2, 2, 5.0f0, 0.2f0, grid, neighbor_table)
-        sim = Simulation(Config(world_size=10.0f0, cell_size=5.0f0), agents, env, x -> nothing)
+        sim = Simulation(Config(world_width=10.0f0, world_length=10.0f0, cell_size=5.0f0), agents, env, x -> nothing)
         
         build_cell_grid!(sim)
         

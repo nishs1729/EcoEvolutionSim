@@ -23,7 +23,7 @@
         
         N = 10
         traits = (dummy = zeros(Float32, N),) 
-        agents = Agents(N, 10.0f0, traits)
+        agents = Agents(N, N, 10.0f0, 10.0f0, traits)
         
         agents.x .= 5.0f0
         agents.y .= 5.0f0
@@ -38,7 +38,7 @@
         neighbor_table = NeighborTable(Matrix{Int32}(undef, 0, 0), Int8[])
         env = EnvironmentState(4, 2, 2, 5.0f0, 0.2f0, grid, neighbor_table)
         
-        config = Config(world_size=10.0f0, strategy=RANDOM_WALK, base_speed=12.0f0) 
+        config = Config(world_width=10.0f0, world_length=10.0f0, strategy=RANDOM_WALK, base_speed=12.0f0) 
         kernel = EcoEvolutionSim.select_movement_kernel(RANDOM_WALK)
         sim = Simulation(config, agents, env, kernel)
         

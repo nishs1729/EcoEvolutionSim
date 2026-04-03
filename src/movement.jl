@@ -29,11 +29,14 @@ function movement_random_walk!(sim::Simulation)
     @timeit to "kernel_rw" begin
         agents = sim.agents
         config = sim.config
-        world = config.world_size
+        world_width = config.world_width
+        world_length = config.world_length
         speed = config.base_speed
+        dt = config.dt
 
         # Pre-calculated constant
-        half = 0.5f0 * speed
+        step_dist = speed * dt
+        half = 0.5f0 * step_dist
 
         x, y = agents.x, agents.y
         vx, vy = agents.vx, agents.vy
@@ -41,10 +44,10 @@ function movement_random_walk!(sim::Simulation)
 
         Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
-                xi, yi = x[i] + rand(Float32) * speed - half, y[i] + rand(Float32) * speed - half
+                xi, yi = x[i] + rand(Float32) * step_dist - half, y[i] + rand(Float32) * step_dist - half
 
-                xi, vxi = reflect!(xi, vx[i], world)
-                yi, vyi = reflect!(yi, vy[i], world)
+                xi, vxi = reflect!(xi, vx[i], world_width)
+                yi, vyi = reflect!(yi, vy[i], world_length)
 
                 x[i], y[i] = xi, yi
                 vx[i], vy[i] = vxi, vyi
@@ -57,12 +60,15 @@ function movement_langevin!(sim::Simulation)
     @timeit to "kernel_langevin" begin
         agents = sim.agents
         config = sim.config
-        world = config.world_size
+        world_width = config.world_width
+        world_length = config.world_length
         noise = config.noise_strength
         friction = config.friction
+        dt = config.dt
 
-        damp = 1f0 - friction
-        halfnoise = 0.5f0 * noise
+        damp = 1f0 - friction * dt
+        step_noise = noise * sqrt(dt)
+        halfnoise = 0.5f0 * step_noise
 
         x, y = agents.x, agents.y
         vx, vy = agents.vx, agents.vy
@@ -70,11 +76,11 @@ function movement_langevin!(sim::Simulation)
 
         Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
-                vxi = vx[i] * damp + noise * rand(Float32) - halfnoise
-                vyi = vy[i] * damp + noise * rand(Float32) - halfnoise
+                vxi = vx[i] * damp + step_noise * rand(Float32) - halfnoise
+                vyi = vy[i] * damp + step_noise * rand(Float32) - halfnoise
 
-                xi, vxi = reflect!(x[i] + vxi, vxi, world)
-                yi, vyi = reflect!(y[i] + vyi, vyi, world)
+                xi, vxi = reflect!(x[i] + vxi * dt, vxi, world_width)
+                yi, vyi = reflect!(y[i] + vyi * dt, vyi, world_length)
 
                 x[i], y[i] = xi, yi
                 vx[i], vy[i] = vxi, vyi
@@ -87,11 +93,15 @@ function movement_correlated_rw!(sim::Simulation)
     @timeit to "kernel_crw" begin
         agents = sim.agents
         config = sim.config
-        world = config.world_size
+        world_width = config.world_width
+        world_length = config.world_length
         noise = config.noise_strength
         speed = config.base_speed
+        dt = config.dt
 
-        halfnoise = 0.5f0 * noise
+        step_dist = speed * dt
+        step_noise = noise * sqrt(dt)
+        halfnoise = 0.5f0 * step_noise
         π32 = Float32(π)
         twopi = 2f0 * π32
 
@@ -101,14 +111,14 @@ function movement_correlated_rw!(sim::Simulation)
 
         Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
-                θ = theta[i] + noise * rand(Float32) - halfnoise
+                θ = theta[i] + step_noise * rand(Float32) - halfnoise
                 s, c = sincos(θ)
-                xi, yi = x[i] + speed * c, y[i] + speed * s
+                xi, yi = x[i] + step_dist * c, y[i] + step_dist * s
 
-                if xi < 0f0 || xi > world
+                if xi < 0f0 || xi > world_width
                     θ = π32 - θ
                 end
-                if yi < 0f0 || yi > world
+                if yi < 0f0 || yi > world_length
                     θ = -θ
                 end
 
@@ -123,9 +133,14 @@ function movement_active_brownian!(sim::Simulation)
     @timeit to "kernel_abm" begin
         agents = sim.agents
         config = sim.config
-        world = config.world_size
+        world_width = config.world_width
+        world_length = config.world_length
         noise = config.noise_strength
         speed = config.base_speed
+        dt = config.dt
+        
+        step_dist = speed * dt
+        step_noise = noise * sqrt(dt)
 
         π32 = Float32(π)
         twopi = 2f0 * π32
@@ -136,14 +151,14 @@ function movement_active_brownian!(sim::Simulation)
 
         Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
-                θ = theta[i] + noise * randn(Float32)
+                θ = theta[i] + step_noise * randn(Float32)
                 s, c = sincos(θ)
-                xi, yi = x[i] + speed * c, y[i] + speed * s
+                xi, yi = x[i] + step_dist * c, y[i] + step_dist * s
 
-                if xi < 0f0 || xi > world
+                if xi < 0f0 || xi > world_width
                     θ = π32 - θ
                 end
-                if yi < 0f0 || yi > world
+                if yi < 0f0 || yi > world_length
                     θ = -θ
                 end
 

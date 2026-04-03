@@ -31,7 +31,7 @@
         )
         
         N = 10000
-        traits = EcoEvolutionSim.initialize_traits(specs, N)
+        traits = EcoEvolutionSim.initialize_traits(specs, N, N)
         
         @test typeof(traits) <: NamedTuple
         @test haskey(traits, :size)

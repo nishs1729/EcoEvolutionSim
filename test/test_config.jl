@@ -5,14 +5,16 @@
         open(temp_config, "w") do io
             write(io, """
             n_agents = 1000
-            world_size = 100.0
+            world_width = 100.0
+            world_length = 100.0
             strategy = "LANGEVIN"
             """)
         end
         
         cfg = load_config(temp_config)
         @test cfg.n_agents == 1000
-        @test cfg.world_size == 100.0f0
+        @test cfg.world_width == 100.0f0
+        @test cfg.world_length == 100.0f0
         @test cfg.strategy == LANGEVIN
         
         rm(temp_config)
@@ -26,7 +28,7 @@
     
     @testset "Agent Initialization" begin
         traits = (traitA = rand(Float32, 100),)
-        agents = Agents(100, 50.0f0, traits)
+        agents = Agents(100, 100, 50.0f0, 50.0f0, traits)
         
         @test length(agents.x) == 100
         @test length(agents.y) == 100

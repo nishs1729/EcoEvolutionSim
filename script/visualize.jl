@@ -20,7 +20,7 @@ color_trait = Observable(sim.agents.traits[Symbol(color_trait_name)])
 fig = Figure(size=(800, 800))
 ax = Axis(fig[1, 1], title="Eco-Evolutionary Simulation (Reflective Boundaries)",
     aspect=DataAspect(),
-    limits=(0, sim.config.world_size, 0, sim.config.world_size))
+    limits=(0, sim.config.world_width, 0, sim.config.world_length))
 
 # 4. Plotting
 # Agents

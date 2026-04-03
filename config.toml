@@ -1,15 +1,20 @@
 # EcoEvolutionSim Configuration
 
 # Simulation
-n_agents = 1_000_000
-max_agents = 2_000_000
-world_size = 50.0
-cell_size = 5.0
-steps_per_frame = 2
+n_agents = 100_000 # initial number of agents
+max_agents = 2_000_000 # max allocated agents
+world_width = 50.0 # km
+world_length = 100.0 # km
+cell_size = 0.5 # km
+steps_per_frame = 2 # steps
+dt = 1.0 # days (time difference per simulation step)
 
 # Movement
 strategy = "RANDOM_WALK" # options: RANDOM_WALK, LANGEVIN, CORRELATED_RW, ACTIVE_BROWNIAN
-base_speed = 0.1
+base_speed = 0.5 # km/day
+noise_strength = 0.1 # units vary by strategy (km/day^(3/2) or radians/sqrt(day))
+friction = 0.1 # 1/day
 
 # ecology / interaction
-r_interact = 1.0
+r_interact = 1.0 # km
+metabolic_rate = 10.0 # Joules/day
