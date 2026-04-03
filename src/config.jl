@@ -1,6 +1,4 @@
-include("dstructs.jl")
-
-const MIN_PARALLEL_N = 1024
+const MIN_PARALLEL_N = 500_000
 
 function Configurations.from_dict(::Type{MovementStrategy}, x::String)
     s = Symbol(uppercase(x))

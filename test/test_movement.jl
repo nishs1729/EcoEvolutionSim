@@ -35,7 +35,8 @@
         orig_y_dead = agents.y[3]
         
         grid = CellGrid(4, N)
-        env = EnvironmentState(4, 2, 2, 5.0f0, grid, Vector{Vector{Int}}())
+        neighbor_table = NeighborTable(Matrix{Int32}(undef, 0, 0), Int8[])
+        env = EnvironmentState(4, 2, 2, 5.0f0, 0.2f0, grid, neighbor_table)
         
         config = Config(world_size=10.0f0, strategy=RANDOM_WALK, base_speed=12.0f0) 
         kernel = EcoEvolutionSim.select_movement_kernel(RANDOM_WALK)

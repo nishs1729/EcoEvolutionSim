@@ -37,10 +37,15 @@ struct Agents{T}
     traits::T
 end
 
+struct NeighborTable
+    neighbors::Matrix{Int32}
+    count::Vector{Int8}
+end
+
 struct CellGrid
-    cell_start::Vector{Int}
-    cell_count::Vector{Int}
-    cell_offset::Vector{Int}
+    cell_start::Vector{Int32}
+    cell_count::Vector{Int32}
+    cell_offset::Vector{Int32}
     agent_index::Vector{Int32}
 end
 
@@ -49,8 +54,9 @@ struct EnvironmentState
     nx::Int
     ny::Int
     cell_size::Float32
+    inv_cell_size::Float32
     grid::CellGrid
-    neighbors::Vector{Vector{Int}}
+    neighbors::NeighborTable
 end
 
 struct Simulation{F, T}

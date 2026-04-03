@@ -3,13 +3,12 @@ using HDF5
 using Random
 
 # --------------------------------
-# User parameters
+# Thread & Argument Management
 # --------------------------------
 
 config_file = "config.toml"
-
 nsteps = 2000
-save_every = 1000
+save_every = 100
 outfile = "data/simulation_output.h5"
 
 # --------------------------------
@@ -33,10 +32,7 @@ h5open(outfile, "w") do file
     file["world_size"] = sim.config.world_size
     file["save_every"] = save_every
 
-    # --------------------------------
     # Preallocated datasets
-    # --------------------------------
-
     x_dset = create_dataset(file, "x", Float32,
         (max_agents, nsaves), chunk=(max_agents, 1), compress=3)
 
@@ -55,10 +51,7 @@ h5open(outfile, "w") do file
     time_dset = create_dataset(file, "time", Int32,
         (nsaves,), chunk=(min(nsaves, 1000),))
 
-    # --------------------------------
     # Trait datasets
-    # --------------------------------
-
     trait_dsets = Dict{String,HDF5.Dataset}()
 
     for (name, _) in pairs(sim.agents.traits)
@@ -73,12 +66,8 @@ h5open(outfile, "w") do file
         )
     end
 
-    # --------------------------------
     # Simulation loop
-    # --------------------------------
-
     snapshot = 0
-
     for step in 1:nsteps
 
         step!(sim)
@@ -92,7 +81,6 @@ h5open(outfile, "w") do file
         if step % save_every == 0
 
             snapshot += 1
-
             alive = sim.agents.alive
 
             # store data
@@ -110,13 +98,9 @@ h5open(outfile, "w") do file
 
             println("Saved snapshot $snapshot (step $step, pop $pop)")
         end
-
     end
 
-    end
-
-    println("\n=== Performance Report ===")
+    # println("\n=== Performance Report ===")
     show(to)
-    println()
-
-    println("\nSimulation complete.")
+    println("\n\nSimulation complete.")
+end

@@ -1,16 +1,3 @@
-using Base.Threads
-using Random
-using TOML
-using Configurations
-using TimerOutputs
-
-const to = TimerOutput()
-
-include("config.jl")
-include("agents.jl")
-include("traits.jl")
-include("space.jl")
-include("movement.jl")
 # Initialize simulation
 function init_simulation(config_path::String = "config.toml", traits_path::String = "script/traits.toml")
     @timeit to "initialization" begin
@@ -24,7 +11,8 @@ function init_simulation(config_path::String = "config.toml", traits_path::Strin
         agents = Agents(config.n_agents, config.world_size, traits)
         neighbor_table = build_neighbor_table(nx, ny)
         grid = CellGrid(ncells, config.n_agents)
-        env = EnvironmentState(ncells, nx, ny, config.cell_size, grid, neighbor_table)
+        inv_cell_size = 1.0f0 / config.cell_size
+        env = EnvironmentState(ncells, nx, ny, config.cell_size, inv_cell_size, grid, neighbor_table)
         movement_kernel = select_movement_kernel(config.strategy)
 
         return Simulation(config, agents, env, movement_kernel)
@@ -35,7 +23,6 @@ end
 function step!(sim::Simulation)
     @timeit to "step" begin
         @timeit to "build_grid" build_cell_grid!(sim)
-        # compute_interactions!(sim, sim.fitness_fn)
         ecology_step!(sim)
         @timeit to "movement" movement_step!(sim)
     end

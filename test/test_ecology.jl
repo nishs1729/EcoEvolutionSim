@@ -8,7 +8,8 @@
         agents.alive .= [true, true, false, true, true]
         
         config = Config()
-        env = EnvironmentState(1, 1, 1, 10.0f0, CellGrid(1, N), Vector{Vector{Int}}())
+        neighbor_table = NeighborTable(Matrix{Int32}(undef, 0, 0), Int8[])
+        env = EnvironmentState(1, 1, 1, 10.0f0, 0.1f0, CellGrid(1, N), neighbor_table)
         sim = Simulation(config, agents, env, x -> nothing)
         
         ecology_step!(sim)
