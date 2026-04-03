@@ -39,7 +39,7 @@ function movement_random_walk!(sim::Simulation)
         vx, vy = agents.vx, agents.vy
         alive = agents.alive
 
-        Threads.@threads for i in eachindex(x)
+        Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
                 xi, yi = x[i] + rand(Float32) * speed - half, y[i] + rand(Float32) * speed - half
 
@@ -68,7 +68,7 @@ function movement_langevin!(sim::Simulation)
         vx, vy = agents.vx, agents.vy
         alive = agents.alive
 
-        Threads.@threads for i in eachindex(x)
+        Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
                 vxi = vx[i] * damp + noise * rand(Float32) - halfnoise
                 vyi = vy[i] * damp + noise * rand(Float32) - halfnoise
@@ -99,7 +99,7 @@ function movement_correlated_rw!(sim::Simulation)
         theta = agents.theta
         alive = agents.alive
 
-        Threads.@threads for i in eachindex(x)
+        Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
                 θ = theta[i] + noise * rand(Float32) - halfnoise
                 s, c = sincos(θ)
@@ -134,7 +134,7 @@ function movement_active_brownian!(sim::Simulation)
         theta = agents.theta
         alive = agents.alive
 
-        Threads.@threads for i in eachindex(x)
+        Threads.@threads for i in 1:agents.max_id
             @inbounds if alive[i]
                 θ = theta[i] + noise * randn(Float32)
                 s, c = sincos(θ)

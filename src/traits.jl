@@ -7,9 +7,9 @@ function load_traits(path::String)
     return traits
 end
 
-function initialize_traits(specs::Dict{String,TraitSpec}, n_agents)
+function initialize_traits(specs::Dict{String,TraitSpec}, max_agents, initial_agents)
     data = Dict{Symbol,Vector{Float32}}()
-    buffer = Vector{Float32}(undef, n_agents)
+    buffer = Vector{Float32}(undef, max_agents)
 
     for (name, spec) in specs
         randn!(buffer)

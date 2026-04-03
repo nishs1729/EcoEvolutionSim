@@ -27,7 +27,7 @@ function build_cell_grid!(sim::Simulation)
     fill!(env.grid.cell_count, 0)
     fill!(env.grid.cell_offset, 0)
 
-    N = length(agents.x)
+    N = agents.max_id
     max_tid = Threads.maxthreadid()
     # max_tid = isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads() # version-safe check for Threads.maxthreadid, ensuring compatibility with older Julia versions while still correctly handling thread-local arrays in more recent versions.
 

@@ -7,10 +7,10 @@ function init_simulation(config_path::String = "config.toml", traits_path::Strin
         ncells = nx * ny
 
         trait_specs = load_traits(traits_path)
-        traits = initialize_traits(trait_specs, config.n_agents)
-        agents = Agents(config.n_agents, config.world_size, traits)
+        traits = initialize_traits(trait_specs, config.max_agents, config.n_agents)
+        agents = Agents(config.max_agents, config.n_agents, config.world_size, traits)
         neighbor_table = build_neighbor_table(nx, ny)
-        grid = CellGrid(ncells, config.n_agents)
+        grid = CellGrid(ncells, config.max_agents)
         inv_cell_size = 1.0f0 / config.cell_size
         env = EnvironmentState(ncells, nx, ny, config.cell_size, inv_cell_size, grid, neighbor_table)
         movement_kernel = select_movement_kernel(config.strategy)
