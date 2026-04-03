@@ -2,33 +2,21 @@ using EcoEvolutionSim
 using HDF5
 using Random
 
-# --------------------------------
-# Thread & Argument Management
-# --------------------------------
-
 config_file = "config.toml"
 nsteps = 2000
 save_every = 100
 outfile = "data/simulation_output.h5"
 
-# --------------------------------
 # Initialize simulation
-# --------------------------------
 sim = init_simulation(config_file)
-
 max_agents = length(sim.agents.x)
-
 nsaves = nsteps ÷ save_every
 
 println("Max agents: ", max_agents)
 println("Snapshots to store: ", nsaves)
 
-# --------------------------------
 # Create HDF5 file
-# --------------------------------
-
 h5open(outfile, "w") do file
-
     file["world_size"] = sim.config.world_size
     file["save_every"] = save_every
 
@@ -52,7 +40,7 @@ h5open(outfile, "w") do file
         (nsaves,), chunk=(min(nsaves, 1000),))
 
     # Trait datasets
-    trait_dsets = Dict{String,HDF5.Dataset}()
+    trait_dsets = Dict{String, HDF5.Dataset}()
 
     for (name, _) in pairs(sim.agents.traits)
         sname = string(name)
@@ -100,7 +88,7 @@ h5open(outfile, "w") do file
         end
     end
 
-    # println("\n=== Performance Report ===")
+    println("\n=== Performance Report ===")
     show(to)
     println("\n\nSimulation complete.")
 end

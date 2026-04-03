@@ -20,7 +20,7 @@ end
     if x < 0f0
         return -x, -v
     elseif x > world
-        return 2f0*world - x, -v
+        return 2f0 * world - x, -v
     end
     return x, v
 end
@@ -39,29 +39,15 @@ function movement_random_walk!(sim::Simulation)
         vx, vy = agents.vx, agents.vy
         alive = agents.alive
 
-        if length(x) > MIN_PARALLEL_N
-            Threads.@threads for i in eachindex(x)
-                @inbounds if alive[i]
-                    xi, yi = x[i] + rand(Float32)*speed - half, y[i] + rand(Float32)*speed - half
+        Threads.@threads for i in eachindex(x)
+            @inbounds if alive[i]
+                xi, yi = x[i] + rand(Float32) * speed - half, y[i] + rand(Float32) * speed - half
 
-                    xi, vxi = reflect!(xi, vx[i], world)
-                    yi, vyi = reflect!(yi, vy[i], world)
+                xi, vxi = reflect!(xi, vx[i], world)
+                yi, vyi = reflect!(yi, vy[i], world)
 
-                    x[i], y[i] = xi, yi
-                    vx[i], vy[i] = vxi, vyi
-                end
-            end
-        else
-            for i in eachindex(x)
-                @inbounds if alive[i]
-                    xi, yi = x[i] + rand(Float32)*speed - half, y[i] + rand(Float32)*speed - half
-
-                    xi, vxi = reflect!(xi, vx[i], world)
-                    yi, vyi = reflect!(yi, vy[i], world)
-
-                    x[i], y[i] = xi, yi
-                    vx[i], vy[i] = vxi, vyi
-                end
+                x[i], y[i] = xi, yi
+                vx[i], vy[i] = vxi, vyi
             end
         end
     end
@@ -82,31 +68,16 @@ function movement_langevin!(sim::Simulation)
         vx, vy = agents.vx, agents.vy
         alive = agents.alive
 
-        if length(x) > MIN_PARALLEL_N
-            Threads.@threads for i in eachindex(x)
-                @inbounds if alive[i]
-                    vxi = vx[i]*damp + noise*rand(Float32) - halfnoise
-                    vyi = vy[i]*damp + noise*rand(Float32) - halfnoise
+        Threads.@threads for i in eachindex(x)
+            @inbounds if alive[i]
+                vxi = vx[i] * damp + noise * rand(Float32) - halfnoise
+                vyi = vy[i] * damp + noise * rand(Float32) - halfnoise
 
-                    xi, vxi = reflect!(x[i] + vxi, vxi, world)
-                    yi, vyi = reflect!(y[i] + vyi, vyi, world)
+                xi, vxi = reflect!(x[i] + vxi, vxi, world)
+                yi, vyi = reflect!(y[i] + vyi, vyi, world)
 
-                    x[i], y[i] = xi, yi
-                    vx[i], vy[i] = vxi, vyi
-                end
-            end
-        else
-            for i in eachindex(x)
-                @inbounds if alive[i]
-                    vxi = vx[i]*damp + noise*rand(Float32) - halfnoise
-                    vyi = vy[i]*damp + noise*rand(Float32) - halfnoise
-
-                    xi, vxi = reflect!(x[i] + vxi, vxi, world)
-                    yi, vyi = reflect!(y[i] + vyi, vyi, world)
-
-                    x[i], y[i] = xi, yi
-                    vx[i], vy[i] = vxi, vyi
-                end
+                x[i], y[i] = xi, yi
+                vx[i], vy[i] = vxi, vyi
             end
         end
     end
@@ -128,41 +99,21 @@ function movement_correlated_rw!(sim::Simulation)
         theta = agents.theta
         alive = agents.alive
 
-        if length(x) > MIN_PARALLEL_N
-            Threads.@threads for i in eachindex(x)
-                @inbounds if alive[i]
-                    θ = theta[i] + noise*rand(Float32) - halfnoise
-                    s, c = sincos(θ)
-                    xi, yi = x[i] + speed*c, y[i] + speed*s
+        Threads.@threads for i in eachindex(x)
+            @inbounds if alive[i]
+                θ = theta[i] + noise * rand(Float32) - halfnoise
+                s, c = sincos(θ)
+                xi, yi = x[i] + speed * c, y[i] + speed * s
 
-                    if xi < 0f0 || xi > world
-                        θ = π32 - θ
-                    end
-                    if yi < 0f0 || yi > world
-                        θ = -θ
-                    end
-
-                    theta[i] = mod(θ, twopi)
-                    x[i], y[i] = xi, yi
+                if xi < 0f0 || xi > world
+                    θ = π32 - θ
                 end
-            end
-        else
-            for i in eachindex(x)
-                @inbounds if alive[i]
-                    θ = theta[i] + noise*rand(Float32) - halfnoise
-                    s, c = sincos(θ)
-                    xi, yi = x[i] + speed*c, y[i] + speed*s
-
-                    if xi < 0f0 || xi > world
-                        θ = π32 - θ
-                    end
-                    if yi < 0f0 || yi > world
-                        θ = -θ
-                    end
-
-                    theta[i] = mod(θ, twopi)
-                    x[i], y[i] = xi, yi
+                if yi < 0f0 || yi > world
+                    θ = -θ
                 end
+
+                theta[i] = mod(θ, twopi)
+                x[i], y[i] = xi, yi
             end
         end
     end
@@ -183,41 +134,21 @@ function movement_active_brownian!(sim::Simulation)
         theta = agents.theta
         alive = agents.alive
 
-        if length(x) > MIN_PARALLEL_N
-            Threads.@threads for i in eachindex(x)
-                @inbounds if alive[i]
-                    θ = theta[i] + noise * randn(Float32)
-                    s, c = sincos(θ)
-                    xi, yi = x[i] + speed*c, y[i] + speed*s
+        Threads.@threads for i in eachindex(x)
+            @inbounds if alive[i]
+                θ = theta[i] + noise * randn(Float32)
+                s, c = sincos(θ)
+                xi, yi = x[i] + speed * c, y[i] + speed * s
 
-                    if xi < 0f0 || xi > world
-                        θ = π32 - θ
-                    end
-                    if yi < 0f0 || yi > world
-                        θ = -θ
-                    end
-
-                    theta[i] = mod(θ, twopi)
-                    x[i], y[i] = xi, yi
+                if xi < 0f0 || xi > world
+                    θ = π32 - θ
                 end
-            end
-        else
-            for i in eachindex(x)
-                @inbounds if alive[i]
-                    θ = theta[i] + noise * randn(Float32)
-                    s, c = sincos(θ)
-                    xi, yi = x[i] + speed*c, y[i] + speed*s
-
-                    if xi < 0f0 || xi > world
-                        θ = π32 - θ
-                    end
-                    if yi < 0f0 || yi > world
-                        θ = -θ
-                    end
-
-                    theta[i] = mod(θ, twopi)
-                    x[i], y[i] = xi, yi
+                if yi < 0f0 || yi > world
+                    θ = -θ
                 end
+
+                theta[i] = mod(θ, twopi)
+                x[i], y[i] = xi, yi
             end
         end
     end

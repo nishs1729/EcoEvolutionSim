@@ -69,12 +69,12 @@ function build_cell_grid!(sim::Simulation)
         @inbounds counts[c, Threads.threadid()] += 1
     end
 
-    @inbounds for c in 1:ncells
+    Threads.@threads for c in 1:ncells
         s = Int32(0)
         for t in 1:max_tid
-            s += counts[c, t]
+            @inbounds s += counts[c, t]
         end
-        env.grid.cell_count[c] = s
+        @inbounds env.grid.cell_count[c] = s
     end
 
     s = Int32(1)
@@ -84,10 +84,10 @@ function build_cell_grid!(sim::Simulation)
     end
 
     offsets = zeros(Int32, ncells, max_tid)
-    @inbounds for c in 1:ncells
-        offsets[c, 1] = 0
+    Threads.@threads for c in 1:ncells
+        @inbounds offsets[c, 1] = 0
         for t in 2:max_tid
-            offsets[c, t] = offsets[c, t-1] + counts[c, t-1]
+            @inbounds offsets[c, t] = offsets[c, t-1] + counts[c, t-1]
         end
     end
 
@@ -110,7 +110,7 @@ function build_neighbor_table(nx, ny)
     neighbors = Matrix{Int32}(undef, 9, ncells)
     count = zeros(Int8, ncells)
     
-    for c in 1:ncells
+    Threads.@threads for c in 1:ncells
         iy = (c - 1) ÷ nx + 1
         ix = c - nx * (iy - 1)
         n_count = 0
@@ -120,11 +120,11 @@ function build_neighbor_table(nx, ny)
                 y2 = iy + dy
                 if 1 ≤ x2 ≤ nx && 1 ≤ y2 ≤ ny
                     n_count += 1
-                    neighbors[n_count, c] = x2 + nx * (y2 - 1)
+                    @inbounds neighbors[n_count, c] = x2 + nx * (y2 - 1)
                 end
             end
         end
-        count[c] = n_count
+        @inbounds count[c] = n_count
     end
     return NeighborTable(neighbors, count)
 end
