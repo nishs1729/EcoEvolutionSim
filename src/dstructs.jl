@@ -43,6 +43,7 @@ mutable struct Agents{T}
     alive::Vector{Bool}
     traits::T
     max_id::Int
+    n_alive::Int                          # O(1) live population counter
     free_indices::Vector{Int}
     death_buffer::Vector{Vector{Int}}
 end
@@ -57,6 +58,8 @@ struct CellGrid
     cell_count::Vector{Int32}
     cell_offset::Vector{Int32}
     agent_index::Vector{Int32}
+    thread_counts::Matrix{Int32}   # ncells × max_tid — reused scratch, avoids per-step alloc
+    thread_offsets::Matrix{Int32}  # ncells × max_tid — reused scratch, avoids per-step alloc
 end
 
 struct EnvironmentState

@@ -6,6 +6,9 @@ using EcoEvolutionSim
 const p_mate = 0.1f0
 const mating_cooldown = 10.0f0 # 2 days
 
+# Thread-local scratch buffers for nearby-male accumulation — avoids per-call heap allocation
+const _MALE_BUFFERS = [Int[] for _ in 1:(isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads())]
+
 function interaction_reproduction!(sim::Simulation, i::Int)
     agents = sim.agents
 
@@ -19,9 +22,10 @@ function interaction_reproduction!(sim::Simulation, i::Int)
         return
     end
 
-    # Search for a mate within r_interact
+    # Search for a mate within r_interact — reuse thread-local buffer
     r_interact = sim.config.r_interact
-    males = Int[]
+    males = _MALE_BUFFERS[Threads.threadid()]
+    empty!(males)
 
     for j in nearby_agents(sim, i, r_interact)
         if agents.gender[j] == 1
@@ -69,6 +73,7 @@ function spawn_offspring!(sim::Simulation, mother_id::Int, father_id::Int)
     agents.age[id] = 0.0f0
     agents.last_mating[id] = 0.0f0
     agents.alive[id] = true
+    # n_alive is incremented inside claim_agent_id! under SPAWN_LOCK (thread-safe)
 
     # Inheritance with 10% mutation magnitude randomly drawn from a parent
     for key in keys(agents.traits)

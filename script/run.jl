@@ -62,7 +62,7 @@ h5open(outfile, "w") do file
     for step in 1:nsteps
 
         step!(sim)
-        pop = sum(sim.agents.alive)
+        pop = sim.agents.n_alive  # O(1) — updated incrementally during ecology/spawn steps
 
         if pop == 0
             println("Extinction reached at step $step. Stopping.")

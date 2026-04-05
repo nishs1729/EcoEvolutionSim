@@ -1,9 +1,12 @@
 function CellGrid(ncells, N)
+    n_threads = isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
     return CellGrid(
-        zeros(Int, ncells),
-        zeros(Int, ncells),
-        zeros(Int, ncells),
-        Vector{Int32}(undef, N)
+        zeros(Int32, ncells),
+        zeros(Int32, ncells),
+        zeros(Int32, ncells),
+        Vector{Int32}(undef, N),
+        zeros(Int32, ncells, n_threads),
+        zeros(Int32, ncells, n_threads),
     )
 end
 
@@ -28,8 +31,7 @@ function build_cell_grid!(sim::Simulation)
     fill!(env.grid.cell_offset, 0)
 
     N = agents.max_id
-    max_tid = Threads.maxthreadid()
-    # max_tid = isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads() # version-safe check for Threads.maxthreadid, ensuring compatibility with older Julia versions while still correctly handling thread-local arrays in more recent versions.
+    max_tid = isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
 
     if Threads.nthreads() == 1
         @inbounds for i in 1:N
@@ -58,8 +60,11 @@ function build_cell_grid!(sim::Simulation)
         return
     end
 
-    # Parallel version using thread-local accumulation to avoid atomic contention
-    counts = zeros(Int32, ncells, max_tid)
+    # Parallel version — reuse pre-allocated scratch buffers to avoid per-step heap allocation
+    counts  = env.grid.thread_counts
+    offsets = env.grid.thread_offsets
+    fill!(counts,  Int32(0))
+    fill!(offsets, Int32(0))
     
     Threads.@threads :static for i in 1:N
         if !alive[i]
@@ -83,7 +88,6 @@ function build_cell_grid!(sim::Simulation)
         s += env.grid.cell_count[c]
     end
 
-    offsets = zeros(Int32, ncells, max_tid)
     Threads.@threads for c in 1:ncells
         @inbounds offsets[c, 1] = 0
         for t in 2:max_tid

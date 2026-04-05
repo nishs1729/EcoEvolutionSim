@@ -9,13 +9,12 @@ end
 
 function initialize_traits(specs::Dict{String,TraitSpec}, max_agents, initial_agents)
     data = Dict{Symbol,Vector{Float32}}()
-    buffer = Vector{Float32}(undef, max_agents)
 
     for (name, spec) in specs
-        randn!(buffer)
-        v = similar(buffer)
-        @inbounds @simd for i in eachindex(buffer)
-            v[i] = spec.mean + spec.sigma * buffer[i]
+        v = Vector{Float32}(undef, max_agents)
+        randn!(v)                                   # fill with N(0,1) in-place
+        @inbounds @simd for i in eachindex(v)
+            v[i] = spec.mean + spec.sigma * v[i]   # transform in-place, no extra alloc
         end
         data[Symbol(name)] = v
     end

@@ -115,10 +115,18 @@ function movement_correlated_rw!(sim::Simulation)
                 s, c = sincos(θ)
                 xi, yi = x[i] + step_dist * c, y[i] + step_dist * s
 
-                if xi < 0f0 || xi > world_width
+                if xi < 0f0
+                    xi = -xi
+                    θ = π32 - θ
+                elseif xi > world_width
+                    xi = 2f0 * world_width - xi
                     θ = π32 - θ
                 end
-                if yi < 0f0 || yi > world_length
+                if yi < 0f0
+                    yi = -yi
+                    θ = -θ
+                elseif yi > world_length
+                    yi = 2f0 * world_length - yi
                     θ = -θ
                 end
 
@@ -155,10 +163,18 @@ function movement_active_brownian!(sim::Simulation)
                 s, c = sincos(θ)
                 xi, yi = x[i] + step_dist * c, y[i] + step_dist * s
 
-                if xi < 0f0 || xi > world_width
+                if xi < 0f0
+                    xi = -xi
+                    θ = π32 - θ
+                elseif xi > world_width
+                    xi = 2f0 * world_width - xi
                     θ = π32 - θ
                 end
-                if yi < 0f0 || yi > world_length
+                if yi < 0f0
+                    yi = -yi
+                    θ = -θ
+                elseif yi > world_length
+                    yi = 2f0 * world_length - yi
                     θ = -θ
                 end
 

@@ -17,6 +17,7 @@ function Agents(max_agents, initial_agents, world_width, world_length, traits)
         alive,
         traits,
         initial_agents,
+        initial_agents,                      # n_alive starts equal to initial_agents
         Int[],
         death_buffer
     )
@@ -33,6 +34,7 @@ function ecology_step!(sim::Simulation)
 
         μ0 = 0.0001f0
         k = 0.01f0
+        mortality_threshold = 1f-6  # skip rand() when mortality is negligibly small
 
         Threads.@threads :static for i in 1:agents.max_id
             @inbounds if alive[i]
@@ -43,18 +45,19 @@ function ecology_step!(sim::Simulation)
                 # Metabolism step
                 energy[i] -= metabolic_drain
 
-                # Death step
+                # Death step — early-out avoids rand() call for young agents
                 @fastmath mortality = μ0 * exp(k * a) * dt
-                if rand(Float32) < mortality
+                if mortality > mortality_threshold && rand(Float32) < mortality
                     alive[i] = false
                     push!(agents.death_buffer[Threads.threadid()], i)
                 end
             end
         end
 
-        # Merge death buffers
+        # Merge death buffers and update n_alive counter
         for t in 1:length(agents.death_buffer)
             if !isempty(agents.death_buffer[t])
+                agents.n_alive -= length(agents.death_buffer[t])
                 append!(agents.free_indices, agents.death_buffer[t])
                 empty!(agents.death_buffer[t])
             end
@@ -68,11 +71,14 @@ function claim_agent_id!(sim::Simulation)
     lock(SPAWN_LOCK)
     try
         if !isempty(sim.agents.free_indices)
-            return pop!(sim.agents.free_indices)
+            id = pop!(sim.agents.free_indices)
+            sim.agents.n_alive += 1   # inside lock — thread-safe
+            return id
         else
             id = sim.agents.max_id + 1
             if id <= length(sim.agents.alive)
                 sim.agents.max_id = id
+                sim.agents.n_alive += 1   # inside lock — thread-safe
                 return id
             else
                 return 0 # Out of bounds
