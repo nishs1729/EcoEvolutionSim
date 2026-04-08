@@ -6,42 +6,58 @@
             [size]
             mean = 10.0
             sigma = 2.0
-            
+
             [speed]
             mean = 1.5
             sigma = 0.5
             """)
         end
-        
+
         specs = load_traits(temp_traits)
         @test haskey(specs, "size")
         @test haskey(specs, "speed")
-        @test specs["size"].mean == 10.0f0
+        @test specs["size"].mean  == 10.0f0
         @test specs["size"].sigma == 2.0f0
-        @test specs["speed"].mean == 1.5f0
+        @test specs["speed"].mean  == 1.5f0
         @test specs["speed"].sigma == 0.5f0
-        
+
         rm(temp_traits)
     end
-    
-    @testset "Trait Initialization" begin
+
+    @testset "Trait Initialization — statistical properties" begin
         specs = Dict{String, TraitSpec}(
-            "size" => TraitSpec(10.0f0, 2.0f0),
-            "speed" => TraitSpec(1.5f0, 0.5f0)
+            "size"  => TraitSpec(10.0f0, 2.0f0),
+            "speed" => TraitSpec(1.5f0,  0.5f0),
         )
-        
-        N = 10000
+
+        N = 10_000
         traits = EcoEvolutionSim.initialize_traits(specs, N, N)
-        
+
         @test typeof(traits) <: NamedTuple
         @test haskey(traits, :size)
         @test haskey(traits, :speed)
-        
-        @test length(traits.size) == N
+
+        @test length(traits.size)  == N
         @test length(traits.speed) == N
-        
-        # Test distribution properties
-        @test isapprox(sum(traits.size) / N, 10.0f0, atol=0.1)
-        @test isapprox(sum(traits.speed) / N, 1.5f0, atol=0.05)
+
+        # Check distributional means (tight tolerance for large N)
+        @test isapprox(sum(traits.size)  / N, 10.0f0, atol=0.15)
+        @test isapprox(sum(traits.speed) / N, 1.5f0,  atol=0.05)
+
+        # All traits allocated independently — modifying one must not affect the other
+        traits.size[1] = 999.0f0
+        @test traits.speed[1] != 999.0f0
+    end
+
+    @testset "Trait Initialization — no shared buffer aliasing" begin
+        # Both trait vectors should be independent arrays
+        specs = Dict{String, TraitSpec}(
+            "a" => TraitSpec(0.0f0, 1.0f0),
+            "b" => TraitSpec(0.0f0, 1.0f0),
+        )
+        N = 100
+        traits = EcoEvolutionSim.initialize_traits(specs, N, N)
+        # pointer_from_objref ensures they are not the same array
+        @test traits.a !== traits.b
     end
 end

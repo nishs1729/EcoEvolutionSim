@@ -27,13 +27,12 @@ function build_cell_grid!(sim::Simulation)
     nx = env.nx
     alive = agents.alive
 
-    fill!(env.grid.cell_count, 0)
-    fill!(env.grid.cell_offset, 0)
-
     N = agents.max_id
     max_tid = isdefined(Threads, :maxthreadid) ? Threads.maxthreadid() : Threads.nthreads()
 
     if Threads.nthreads() == 1
+        fill!(env.grid.cell_count, Int32(0))
+        fill!(env.grid.cell_offset, Int32(0))
         @inbounds for i in 1:N
             if !alive[i]
                 continue
@@ -60,12 +59,21 @@ function build_cell_grid!(sim::Simulation)
         return
     end
 
-    # Parallel version — reuse pre-allocated scratch buffers to avoid per-step heap allocation
+    # Parallel version — 2 :static barriers, zero Task allocations
+    #
+    # Old design (4 barriers):
+    #   :static count | dynamic reduce | serial prefix-sum | dynamic offsets | :static place
+    #   The two dynamic @threads calls allocated Julia Tasks each step → ~77 KiB/call at 12t.
+    #
+    # New design (2 barriers):
+    #   :static count | serial combined pass | :static place
+    #   The serial pass does cell_start + cell_count + per-thread offsets in one sweep.
+    #   Cost: O(ncells × max_tid) scalar ops — ~60k for typical configs, < 0.05 ms.
     counts  = env.grid.thread_counts
     offsets = env.grid.thread_offsets
     fill!(counts,  Int32(0))
-    fill!(offsets, Int32(0))
-    
+
+    # Barrier 1: each thread counts agents into its private column of `counts`
     Threads.@threads :static for i in 1:N
         if !alive[i]
             continue
@@ -74,27 +82,24 @@ function build_cell_grid!(sim::Simulation)
         @inbounds counts[c, Threads.threadid()] += 1
     end
 
-    Threads.@threads for c in 1:ncells
-        s = Int32(0)
-        for t in 1:max_tid
-            @inbounds s += counts[c, t]
-        end
-        @inbounds env.grid.cell_count[c] = s
-    end
-
+    # Serial combined pass — replaces three separate phases:
+    #   (a) reduce counts[:, 1:T] → cell_count[c]   (was a parallel @threads loop)
+    #   (b) exclusive prefix-sum → cell_start[c]     (was a serial loop)
+    #   (c) per-thread offsets within each cell       (was a parallel @threads loop)
+    # All three are now one O(ncells × max_tid) pass with sequential memory access.
     s = Int32(1)
     @inbounds for c in 1:ncells
         env.grid.cell_start[c] = s
-        s += env.grid.cell_count[c]
-    end
-
-    Threads.@threads for c in 1:ncells
-        @inbounds offsets[c, 1] = 0
-        for t in 2:max_tid
-            @inbounds offsets[c, t] = offsets[c, t-1] + counts[c, t-1]
+        running = Int32(0)
+        for t in 1:max_tid
+            offsets[c, t] = running          # exclusive prefix within this cell
+            running += counts[c, t]
         end
+        env.grid.cell_count[c] = running    # total agents in cell c
+        s += running
     end
 
+    # Barrier 2: each thread places its agents using the pre-computed offsets
     Threads.@threads :static for i in 1:N
         if !alive[i]
             continue

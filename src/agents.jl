@@ -10,6 +10,7 @@ function Agents(max_agents, initial_agents, world_width, world_length, traits)
         rand(Float32, max_agents) .* world_length,
         zeros(Float32, max_agents),
         zeros(Float32, max_agents),
+        rand(Float32, max_agents) .* (2f0 * Float32(π)),  # theta: random initial heading
         rand(UInt8(0):UInt8(1), max_agents),
         rand(Float32, max_agents),
         rand(Float32, max_agents) .* 10f0,   # initial age

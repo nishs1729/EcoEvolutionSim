@@ -36,14 +36,15 @@ mutable struct Agents{T}
     y::Vector{Float32}
     vx::Vector{Float32}
     vy::Vector{Float32}
-    gender::Vector{UInt8} # 0: female, 1: male
+    theta::Vector{Float32}           # heading angle (radians) — used by CORRELATED_RW & ACTIVE_BROWNIAN
+    gender::Vector{UInt8}            # 0: female, 1: male
     energy::Vector{Float32}
     age::Vector{Float32}
     last_mating::Vector{Float32}
     alive::Vector{Bool}
     traits::T
     max_id::Int
-    n_alive::Int                          # O(1) live population counter
+    n_alive::Int                     # O(1) live population counter
     free_indices::Vector{Int}
     death_buffer::Vector{Vector{Int}}
 end
